@@ -1,0 +1,30 @@
+# Gradle & Build Artifacts
+.gradle/
+build/
+*/build/
+bin/
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+local.properties
+.DS_Store
+Thumbs.db
+capture/
+
+# Output packages (uploaded to GitHub Releases instead of git repo)
+*.apk
+*.aab
+*.dex
+*.class
+
+# Log files
+*.log
+
+# Antigravity temporary files
+.system_generated/
