@@ -84,6 +84,8 @@ interface TimetableRepository {
 
 interface LectureRepository {
     fun observeLecturesForSubject(subjectId: String): Flow<List<Lecture>>
+    fun observeLectureById(lectureId: String): Flow<Lecture?>
+    fun observeAllLectures(): Flow<List<Lecture>>
     fun observeSourceFilesForLecture(lectureId: String): Flow<List<SourceFile>>
     fun observeChunksForFile(fileId: String): Flow<List<SourceChunk>>
     suspend fun createOrUpdateLecture(
@@ -117,6 +119,9 @@ interface StudyRepository {
     fun observeTopicsForSubject(subjectId: String): Flow<List<Topic>>
     fun observeLearningItemsForLecture(lectureId: String): Flow<List<LearningItem>>
     fun observeDraftItems(): Flow<List<LearningItem>>
+    fun observeDraftsForLecture(lectureId: String): Flow<List<LearningItem>>
+    fun observeItemById(itemId: String): Flow<LearningItem?>
+    fun observeAllLearningItems(): Flow<List<LearningItem>>
     fun observeApprovedDrops(): Flow<List<Pair<LearningItem, DropState>>>
     fun observeAiJobs(): Flow<List<AiJob>>
     suspend fun createOrGetTopic(subjectId: String, name: String, coreWeight: Double = 0.5): Topic
@@ -143,6 +148,7 @@ interface StudyRepository {
         newOptions: List<Pair<String, Boolean>>
     ): Result<LearningItem>
     suspend fun approveItem(itemId: String): Result<LearningItem>
+    suspend fun approveDraftItem(itemId: String): Result<LearningItem> = approveItem(itemId)
     suspend fun rejectItem(itemId: String)
     suspend fun updateDropState(itemId: String, visibilityState: DropVisibilityState)
 }
@@ -155,6 +161,7 @@ interface QuizRepository {
         scope: QuizScopeSnapshot,
         random: Random = Random.Default
     ): Pair<QuizSession?, QuizSelectionResult>
+    suspend fun createQuizSession(scope: QuizScopeSnapshot): QuizSession
     suspend fun recordAnswer(
         sessionId: String,
         itemId: String,

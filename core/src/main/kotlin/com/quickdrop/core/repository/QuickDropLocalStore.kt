@@ -204,6 +204,11 @@ class QuickDropLocalStore(
                 .sortedWith(compareByDescending<Lecture> { it.localDateIso }.thenByDescending { it.createdAtEpochMs })
         }
 
+    override fun observeLectureById(lectureId: String): Flow<Lecture?> =
+        lecturesFlow.map { list -> list.find { it.id == lectureId } }
+
+    override fun observeAllLectures(): Flow<List<Lecture>> = lecturesFlow
+
     override fun observeSourceFilesForLecture(lectureId: String): Flow<List<SourceFile>> =
         filesFlow.map { list -> list.filter { it.lectureId == lectureId } }
 
@@ -380,6 +385,14 @@ class QuickDropLocalStore(
 
     override fun observeDraftItems(): Flow<List<LearningItem>> =
         itemsFlow.map { list -> list.filter { it.approvalStatus == ApprovalStatus.DRAFT } }
+
+    override fun observeDraftsForLecture(lectureId: String): Flow<List<LearningItem>> =
+        itemsFlow.map { list -> list.filter { it.lectureId == lectureId && it.approvalStatus == ApprovalStatus.DRAFT } }
+
+    override fun observeItemById(itemId: String): Flow<LearningItem?> =
+        itemsFlow.map { list -> list.find { it.id == itemId } }
+
+    override fun observeAllLearningItems(): Flow<List<LearningItem>> = itemsFlow
 
     override fun observeApprovedDrops(): Flow<List<Pair<LearningItem, DropState>>> =
         combine(itemsFlow, dropStatesFlow) { items, states ->
@@ -827,6 +840,11 @@ class QuickDropLocalStore(
         )
         sessionsFlow.update { it + session }
         session to selectionResult
+    }
+
+    override suspend fun createQuizSession(scope: QuizScopeSnapshot): QuizSession {
+        val (session, _) = startNewQuizSession(scope)
+        return session ?: throw IllegalStateException("No eligible questions available for quiz session")
     }
 
     override suspend fun recordAnswer(

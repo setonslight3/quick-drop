@@ -1,10 +1,16 @@
 package com.quickdrop.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,20 +18,41 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,31 +78,40 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.quickdrop.app.QuickDropApplication
+import com.quickdrop.app.ui.theme.QuickDropColors
 import com.quickdrop.core.domain.ClassOccurrence
 import com.quickdrop.core.domain.SpacedRepetitionScheduler
 import com.quickdrop.core.model.ApprovalStatus
 import com.quickdrop.core.model.ClassSlot
 import com.quickdrop.core.model.Difficulty
 import com.quickdrop.core.model.DropVisibilityState
+import com.quickdrop.core.model.LearningItem
 import com.quickdrop.core.model.LearningItemKind
 import com.quickdrop.core.model.QuizScopeSnapshot
 import com.quickdrop.core.model.ResponseOutcome
 import com.quickdrop.core.model.ScheduleException
 import com.quickdrop.core.model.ScheduleExceptionAction
+import com.quickdrop.core.model.Subject
 import com.quickdrop.core.model.ThemePreference
 import com.quickdrop.core.model.TopicMasteryStatus
 import com.quickdrop.core.model.UserPreferences
 import kotlinx.coroutines.launch
+import java.util.UUID
 
-enum class BottomNavTab(val label: String) {
-    HOME("Home"),
-    TIMETABLE("Timetable"),
-    STUDY("Study"),
-    PROGRESS("Progress")
+enum class BottomNavTab(val label: String, val icon: ImageVector) {
+    HOME("Home", Icons.Default.Home),
+    TIMETABLE("Timetable", Icons.Default.CalendarMonth),
+    STUDY("Study", Icons.Default.Quiz),
+    INGESTION("Upload", Icons.Default.FileUpload),
+    PROGRESS("Analytics", Icons.Default.Insights)
 }
 
 sealed class ActiveScreen {
@@ -132,18 +168,27 @@ fun QuickDropAppShell(
     if (showQuitQuizConfirmDialog && activeQuizSession != null) {
         AlertDialog(
             onDismissRequest = { showQuitQuizConfirmDialog = false },
-            title = { Text("Pause or Discard Quiz?") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, tint = QuickDropColors.Amber)
+                    Text("Pause or Discard Quiz?", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                }
+            },
             text = {
-                Text("Your answered questions are saved locally. You can resume later from Home or Study, or discard this session without affecting your topic mastery.")
+                Text(
+                    "Your answered questions are saved locally. You can resume later from Home or Study, or discard this session without affecting your topic mastery.",
+                    color = QuickDropColors.TextSecondary
+                )
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showQuitQuizConfirmDialog = false
                         activeScreen = ActiveScreen.MainTabs
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald)
                 ) {
-                    Text("Save & Resume Later")
+                    Text("Save & Resume Later", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -159,70 +204,155 @@ fun QuickDropAppShell(
                         }
                     }
                 ) {
-                    Text("Discard Session")
+                    Text("Discard Session", color = QuickDropColors.RoseLight)
                 }
             }
         )
     }
 
     Scaffold(
+        containerColor = QuickDropColors.CosmicBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Quick Drop")
-                        Text(
-                            text = "Local-first study companion • Offline ready",
-                            style = MaterialTheme.typography.labelSmall
+            // Sleek Modern Mobile Top App Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(QuickDropColors.CosmicSurface)
+                    .border(1.dp, QuickDropColors.CosmicBorder)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(QuickDropColors.EmeraldGradient),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "Logo",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { activeScreen = ActiveScreen.Settings },
-                        modifier = Modifier.semantics { contentDescription = "Open Settings" }
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "Quick Drop",
+                                color = QuickDropColors.TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0x3310B981))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            ) {
+                                Text("PRO", color = QuickDropColors.EmeraldLight, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Text(
+                            text = when (activeScreen) {
+                                ActiveScreen.MainTabs -> selectedTab.label
+                                is ActiveScreen.SubjectDetail -> "Course Syllabus"
+                                is ActiveScreen.LectureEditor -> "Lecture Editor"
+                                is ActiveScreen.MaterialReview -> "Review Extracted Drops"
+                                is ActiveScreen.QuizSetup -> "Configure Quiz Sprint"
+                                is ActiveScreen.QuizRunner -> "Active Recall Session"
+                                is ActiveScreen.QuizResults -> "Quiz Results"
+                                ActiveScreen.Settings -> "Settings & Privacy"
+                            },
+                            color = QuickDropColors.TextMuted,
+                            fontSize = 11.sp
+                        )
                     }
                 }
-            )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (activeScreen != ActiveScreen.MainTabs) {
+                        OutlinedButton(
+                            onClick = {
+                                if (activeScreen is ActiveScreen.QuizRunner) {
+                                    showQuitQuizConfirmDialog = true
+                                } else {
+                                    activeScreen = ActiveScreen.MainTabs
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(32.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Back", fontSize = 11.sp)
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { activeScreen = ActiveScreen.Settings },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = if (activeScreen is ActiveScreen.Settings) QuickDropColors.Emerald else QuickDropColors.TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         },
         bottomBar = {
             if (activeScreen == ActiveScreen.MainTabs) {
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = selectedTab == BottomNavTab.HOME,
-                        onClick = { selectedTab = BottomNavTab.HOME },
-                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                        label = { Text("Home") }
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == BottomNavTab.TIMETABLE,
-                        onClick = { selectedTab = BottomNavTab.TIMETABLE },
-                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                        label = { Text("Timetable") }
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == BottomNavTab.STUDY,
-                        onClick = { selectedTab = BottomNavTab.STUDY },
-                        icon = { Icon(Icons.Default.Quiz, contentDescription = null) },
-                        label = { Text("Study") }
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == BottomNavTab.PROGRESS,
-                        onClick = { selectedTab = BottomNavTab.PROGRESS },
-                        icon = { Icon(Icons.Default.Insights, contentDescription = null) },
-                        label = { Text("Progress") }
-                    )
+                NavigationBar(
+                    containerColor = QuickDropColors.CosmicSurface,
+                    tonalElevation = 8.dp,
+                    modifier = Modifier.border(1.dp, QuickDropColors.CosmicBorder)
+                ) {
+                    BottomNavTab.entries.forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { selectedTab = tab },
+                            icon = {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label,
+                                    tint = if (isSelected) QuickDropColors.Emerald else QuickDropColors.TextMuted,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = tab.label,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextMuted,
+                                    maxLines = 1
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             when (val screen = activeScreen) {
                 ActiveScreen.MainTabs -> {
@@ -232,20 +362,34 @@ fun QuickDropAppShell(
                             onOpenSubject = { activeScreen = ActiveScreen.SubjectDetail(it) },
                             onOpenQuizSetup = { activeScreen = ActiveScreen.QuizSetup(it) },
                             onResumeSession = { activeScreen = ActiveScreen.QuizRunner(it) },
-                            onAddLecture = { activeScreen = ActiveScreen.LectureEditor(it, null) }
+                            onAddLecture = { activeScreen = ActiveScreen.LectureEditor(it, null) },
+                            onOpenTimetable = { selectedTab = BottomNavTab.TIMETABLE },
+                            onOpenUpload = { selectedTab = BottomNavTab.INGESTION }
                         )
+
                         BottomNavTab.TIMETABLE -> TimetableScreen(
                             app = app,
                             onOpenSubject = { activeScreen = ActiveScreen.SubjectDetail(it) }
                         )
+
                         BottomNavTab.STUDY -> StudyScreen(
                             app = app,
                             onStartQuizSetup = { activeScreen = ActiveScreen.QuizSetup(it) },
                             onResumeQuiz = { activeScreen = ActiveScreen.QuizRunner(it) }
                         )
+
+                        BottomNavTab.INGESTION -> AndroidFileIngestionStudio(
+                            store = app.localStore,
+                            clock = app.clock,
+                            geminiClient = app.activeGeminiClient(),
+                            subjects = subjects,
+                            onReviewLecture = { activeScreen = ActiveScreen.MaterialReview(it) }
+                        )
+
                         BottomNavTab.PROGRESS -> ProgressScreen(app = app)
                     }
                 }
+
                 is ActiveScreen.SubjectDetail -> SubjectDetailScreen(
                     app = app,
                     subjectId = screen.subjectId,
@@ -254,6 +398,7 @@ fun QuickDropAppShell(
                     onReviewMaterial = { activeScreen = ActiveScreen.MaterialReview(it) },
                     onPrepareQuiz = { activeScreen = ActiveScreen.QuizSetup(screen.subjectId) }
                 )
+
                 is ActiveScreen.LectureEditor -> LectureEditorScreen(
                     app = app,
                     subjectId = screen.subjectId,
@@ -261,11 +406,13 @@ fun QuickDropAppShell(
                     onBack = { activeScreen = ActiveScreen.SubjectDetail(screen.subjectId) },
                     onOpenMaterialReview = { activeScreen = ActiveScreen.MaterialReview(it) }
                 )
+
                 is ActiveScreen.MaterialReview -> MaterialReviewScreen(
                     app = app,
                     lectureId = screen.lectureId,
                     onBack = { activeScreen = ActiveScreen.MainTabs }
                 )
+
                 is ActiveScreen.QuizSetup -> QuizSetupScreen(
                     app = app,
                     primarySubjectId = screen.primarySubjectId,
@@ -273,18 +420,21 @@ fun QuickDropAppShell(
                     onBack = { activeScreen = ActiveScreen.MainTabs },
                     onSessionStarted = { activeScreen = ActiveScreen.QuizRunner(it) }
                 )
+
                 is ActiveScreen.QuizRunner -> QuizRunnerScreen(
                     app = app,
                     sessionId = screen.sessionId,
                     onRequestQuit = { showQuitQuizConfirmDialog = true },
                     onQuizCompleted = { activeScreen = ActiveScreen.QuizResults(it) }
                 )
+
                 is ActiveScreen.QuizResults -> QuizResultsScreen(
                     app = app,
                     sessionId = screen.sessionId,
                     onDone = { activeScreen = ActiveScreen.MainTabs },
                     onRetryDueOrMissed = { subjId -> activeScreen = ActiveScreen.QuizSetup(subjId) }
                 )
+
                 ActiveScreen.Settings -> SettingsScreen(
                     app = app,
                     preferences = preferences,
@@ -295,13 +445,20 @@ fun QuickDropAppShell(
     }
 }
 
+// =========================================================================
+// 1. MOBILE HOME DASHBOARD (Hero Card, Quick Actions, 2x2 Stats, Flip Card)
+// =========================================================================
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeScreen(
     app: QuickDropApplication,
     onOpenSubject: (String) -> Unit,
     onOpenQuizSetup: (String?) -> Unit,
     onResumeSession: (String) -> Unit,
-    onAddLecture: (String) -> Unit
+    onAddLecture: (String) -> Unit,
+    onOpenTimetable: () -> Unit,
+    onOpenUpload: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val subjects by app.localStore.observeActiveSubjects().collectAsState(initial = emptyList())
@@ -309,179 +466,409 @@ private fun HomeScreen(
     val reviewStates by app.localStore.observeTopicReviewStates().collectAsState(initial = emptyMap())
     val drops by app.localStore.observeApprovedDrops().collectAsState(initial = emptyList())
     var upcomingOccurrences by remember { mutableStateOf<List<ClassOccurrence>>(emptyList()) }
-    var newSubjectName by rememberSaveable { mutableStateOf("") }
+    var showNewSubjectDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(subjects) {
         upcomingOccurrences = app.localStore.getUpcomingOccurrences(daysAhead = 7)
     }
 
+    val nextOcc = upcomingOccurrences.firstOrNull()
+    val nextSubj = subjects.find { it.id == nextOcc?.subjectId }
+
     val dueCount = reviewStates.values.count { state ->
         val due = state.dueAtEpochMs
         due != null && due <= app.clock.now().toEpochMilli()
     }
+    val stableCount = reviewStates.values.count {
+        SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.STABLE
+    }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Hero Readiness Card
         item {
-            Text(
-                text = "Today: ${app.clock.localDate()}",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "Due topics for review: $dueCount",
-                style = MaterialTheme.typography.bodyMedium
+            HeroReadinessCard(
+                studentName = "Alex",
+                streakDays = 4,
+                readinessPercent = 88,
+                nextClassTitle = nextSubj?.name?.let { "$it (${nextOcc?.startZoned?.toLocalTime()})" },
+                nextClassCountdown = "TODAY",
+                nextClassLocation = nextOcc?.location,
+                onLaunchPrepQuiz = { onOpenQuizSetup(nextSubj?.id) }
             )
         }
 
+        // Quick Action Shortcuts Bar
+        item {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onOpenTimetable,
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = QuickDropColors.Emerald, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Upload Timetable File", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onOpenUpload,
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Default.FileUpload, contentDescription = null, tint = QuickDropColors.Violet, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Upload Slides (PDF/HTML)", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { onOpenQuizSetup(null) },
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = QuickDropColors.Amber, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("10-Q Sprint", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = { showNewSubjectDialog = true },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("+ Course", fontSize = 11.sp)
+                }
+            }
+        }
+
+        // Active Quiz Resume Alert (if quiz is currently paused)
         if (activeSession != null) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Quiz in progress", style = MaterialTheme.typography.titleSmall)
-                        Text("Question ${activeSession!!.currentQuestionIndex + 1} of ${activeSession!!.itemIdsInOrder.size}")
-                        Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFF2E1065), Color(0xFF1E1B4B)))
+                        )
+                        .border(1.dp, QuickDropColors.Violet.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(QuickDropColors.Violet.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Bolt, contentDescription = null, tint = QuickDropColors.VioletLight)
+                            }
+                            Column {
+                                Text("Quiz in Progress", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("Question ${activeSession!!.currentQuestionIndex + 1} of ${activeSession!!.itemIdsInOrder.size} • Answers saved locally", color = QuickDropColors.VioletLight, fontSize = 11.sp)
+                            }
+                        }
+
                         Button(
                             onClick = { onResumeSession(activeSession!!.id) },
-                            modifier = Modifier.heightIn(min = 48.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Violet),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Continue Quiz")
+                            Text("Resume", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }
             }
         }
 
+        // 4 Key Metric Stats (2x2 Grid)
         item {
-            Text("Upcoming Classes", style = MaterialTheme.typography.titleMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatMetricCard(
+                        label = "Enrolled Courses",
+                        value = "${subjects.size}",
+                        subtext = "Active Term",
+                        icon = Icons.Default.School,
+                        iconColor = QuickDropColors.Cyan,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatMetricCard(
+                        label = "Due for Review",
+                        value = "$dueCount",
+                        subtext = "Needs attention",
+                        icon = Icons.Default.Schedule,
+                        iconColor = QuickDropColors.Amber,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatMetricCard(
+                        label = "Mastered Topics",
+                        value = "$stableCount",
+                        subtext = "Stable recall",
+                        icon = Icons.Default.CheckCircle,
+                        iconColor = QuickDropColors.Emerald,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatMetricCard(
+                        label = "Study Streak",
+                        value = "4 Days",
+                        subtext = "Keep momentum!",
+                        icon = Icons.Default.LocalFireDepartment,
+                        iconColor = QuickDropColors.Rose,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
-        if (upcomingOccurrences.isEmpty()) {
+        // Drop of the Day (Interactive 3D Flip Card directly on Home!)
+        if (drops.isNotEmpty()) {
+            val (featuredDrop, dropState) = drops.first()
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("No classes scheduled yet.")
-                        Text("Add a subject below and configure recurring slots in the Timetable tab.")
-                    }
-                }
-            }
-        } else {
-            items(upcomingOccurrences.take(5), key = { it.occurrenceId }) { occ ->
-                val subject = subjects.find { it.id == occ.subjectId }
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = subject?.name ?: "Course",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(
-                            text = "${occ.effectiveLocalDate} • ${occ.startZoned.toLocalTime()} - ${occ.endZoned.toLocalTime()} (${occ.location.ifBlank { "No room" }})"
-                        )
-                        if (occ.isMoved) {
-                            Text("Moved occurrence (one-off exception)", color = MaterialTheme.colorScheme.tertiary)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = QuickDropColors.AmberLight, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "Drop of the Day • Daily Active Recall",
+                                color = QuickDropColors.TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { onOpenQuizSetup(occ.subjectId) },
-                                modifier = Modifier.heightIn(min = 48.dp)
-                            ) {
-                                Text("Prepare")
-                            }
-                            OutlinedButton(
-                                onClick = { onAddLecture(occ.subjectId) },
-                                modifier = Modifier.heightIn(min = 48.dp)
-                            ) {
-                                Text("Add Material")
+                        Text(
+                            text = "Tap to flip",
+                            color = QuickDropColors.TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    InteractiveFlipCard(
+                        topicName = featuredDrop.evidenceQuote.take(22).ifBlank { "Core Concept" },
+                        prompt = featuredDrop.promptOrBody,
+                        explanation = featuredDrop.explanation,
+                        evidenceQuote = featuredDrop.evidenceQuote,
+                        anchorText = "${featuredDrop.anchorKind ?: "PAGE"} ${featuredDrop.anchorIndex ?: 1}",
+                        isSaved = dropState.visibilityState == DropVisibilityState.SAVED,
+                        onToggleSave = {
+                            val next = if (dropState.visibilityState == DropVisibilityState.SAVED) DropVisibilityState.UNSEEN else DropVisibilityState.SAVED
+                            scope.launch { app.localStore.updateDropState(featuredDrop.id, next) }
+                        },
+                        onRateConfidence = { rating ->
+                            scope.launch {
+                                val nextState = when (rating) {
+                                    "HARD" -> DropVisibilityState.REVIEW
+                                    "GOOD" -> DropVisibilityState.UNDERSTOOD
+                                    else -> DropVisibilityState.SAVED
+                                }
+                                app.localStore.updateDropState(featuredDrop.id, nextState)
                             }
                         }
-                    }
+                    )
                 }
             }
         }
 
+        // Active Course Syllabus Cards
         item {
-            Text("Subjects", style = MaterialTheme.typography.titleMedium)
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = newSubjectName,
-                    onValueChange = { newSubjectName = it },
-                    label = { Text("New Subject Name") },
-                    modifier = Modifier.weight(1f)
+                Text(
+                    text = "Enrolled Courses (${subjects.size})",
+                    color = QuickDropColors.TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
-                Button(
-                    onClick = {
-                        if (newSubjectName.isNotBlank()) {
-                            val nameToCreate = newSubjectName
-                            newSubjectName = ""
-                            scope.launch {
-                                app.localStore.createOrUpdateSubject(
-                                    name = nameToCreate,
-                                    colorKey = "green",
-                                    iconKey = "book"
+
+                TextButton(onClick = { showNewSubjectDialog = true }) {
+                    Text("+ Add Course", color = QuickDropColors.EmeraldLight, fontSize = 12.sp)
+                }
+            }
+        }
+
+        items(subjects, key = { it.id }) { subj ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        when (subj.colorKey) {
+                                            "violet" -> Color(0x338B5CF6)
+                                            "cyan" -> Color(0x3306B6D4)
+                                            "rose" -> Color(0x33F43F5E)
+                                            else -> Color(0x3310B981)
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when (subj.iconKey) {
+                                        "cloud" -> Icons.Default.Science
+                                        "security" -> Icons.Default.Psychology
+                                        else -> Icons.Default.Code
+                                    },
+                                    contentDescription = null,
+                                    tint = when (subj.colorKey) {
+                                        "violet" -> QuickDropColors.VioletLight
+                                        "cyan" -> QuickDropColors.CyanLight
+                                        "rose" -> QuickDropColors.RoseLight
+                                        else -> QuickDropColors.EmeraldLight
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = subj.name,
+                                    color = QuickDropColors.TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "${subj.term ?: "First Semester 2026/2027"} • ${subj.instructor ?: "Faculty"}",
+                                    color = QuickDropColors.TextSecondary,
+                                    fontSize = 11.sp
                                 )
                             }
                         }
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) {
-                    Text("Add")
-                }
-            }
-        }
-
-        items(subjects, key = { it.id }) { subject ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(subject.name, style = MaterialTheme.typography.titleSmall)
-                        val termValue = subject.term
-                        if (!termValue.isNullOrBlank()) {
-                            Text(termValue, style = MaterialTheme.typography.bodySmall)
-                        }
                     }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { onOpenSubject(subject.id) },
-                            modifier = Modifier.heightIn(min = 48.dp)
+                            onClick = { onAddLecture(subj.id) },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
                         ) {
-                            Text("Open")
+                            Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(13.dp), tint = QuickDropColors.VioletLight)
+                            Spacer(Modifier.width(4.dp))
+                            Text("+ Upload", fontSize = 11.sp, color = QuickDropColors.VioletLight)
                         }
-                        Button(
-                            onClick = { onOpenQuizSetup(subject.id) },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Quiz")
-                        }
-                    }
-                }
-            }
-        }
 
-        if (drops.isNotEmpty()) {
-            item {
-                val (latestDrop, _) = drops.first()
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Recent Drop", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Text(latestDrop.promptOrBody)
+                        OutlinedButton(
+                            onClick = { onOpenSubject(subj.id) },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Text("Lectures", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = { onOpenQuizSetup(subj.id) },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                            modifier = Modifier.weight(1f).height(38.dp)
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Quiz", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
         }
     }
+
+    if (showNewSubjectDialog) {
+        var name by remember { mutableStateOf("") }
+        var instructor by remember { mutableStateOf("") }
+        var term by remember { mutableStateOf("First Semester 2026/2027") }
+
+        AlertDialog(
+            onDismissRequest = { showNewSubjectDialog = false },
+            title = { Text("Add Course", fontWeight = FontWeight.Bold, color = QuickDropColors.TextPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Course Name (e.g. SEN 201 - Software Eng)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = instructor,
+                        onValueChange = { instructor = it },
+                        label = { Text("Instructor (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = term,
+                        onValueChange = { term = it },
+                        label = { Text("Academic Term") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (name.isNotBlank()) {
+                            scope.launch {
+                                app.localStore.createOrUpdateSubject(
+                                    name = name,
+                                    colorKey = "cyan",
+                                    iconKey = "code",
+                                    term = term,
+                                    instructor = instructor
+                                )
+                                showNewSubjectDialog = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald)
+                ) {
+                    Text("Create Course")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewSubjectDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+// =========================================================================
+// 2. MOBILE TIMETABLE SCREEN (Obsidian Matrix + Day Cards View + Modals)
+// =========================================================================
+
 @Composable
 private fun TimetableScreen(
     app: QuickDropApplication,
@@ -490,175 +877,352 @@ private fun TimetableScreen(
     val scope = rememberCoroutineScope()
     val subjects by app.localStore.observeActiveSubjects().collectAsState(initial = emptyList())
     val slots by app.localStore.observeSlots().collectAsState(initial = emptyList())
-    val exceptions by app.localStore.observeExceptions().collectAsState(initial = emptyList())
 
-    var selectedSubjectId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedWeekdayIso by rememberSaveable { mutableStateOf(1) }
-    var startHour by rememberSaveable { mutableStateOf("09") }
-    var endHour by rememberSaveable { mutableStateOf("10") }
-    var location by rememberSaveable { mutableStateOf("Room 101") }
-    var overlapWarningMessage by remember { mutableStateOf<String?>(null) }
+    var showUploadModal by remember { mutableStateOf(false) }
+    var showAddSlotModal by remember { mutableStateOf(false) }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeeklyTimetableBoard(
+            clock = app.clock,
+            subjects = subjects,
+            slots = slots,
+            onUploadClick = { showUploadModal = true },
+            onLoadDefaultTemplate = {
+                scope.launch {
+                    importRecognizedSlotsIntoStore(getCybersecurity200LSlots(), app.localStore, subjects, app.clock)
+                }
+            },
+            onOpenSubject = onOpenSubject
+        )
+    }
+
+    if (showUploadModal) {
+        AndroidUploadTimetableFileModal(
+            store = app.localStore,
+            clock = app.clock,
+            subjects = subjects,
+            onDismiss = { showUploadModal = false },
+            onImportComplete = { showUploadModal = false }
+        )
+    }
+
+    if (showAddSlotModal) {
+        AndroidAddClassSlotModal(
+            store = app.localStore,
+            clock = app.clock,
+            subjects = subjects,
+            onDismiss = { showAddSlotModal = false },
+            onSlotAdded = { showAddSlotModal = false }
+        )
+    }
+}
+
+// =========================================================================
+// 3. MOBILE STUDY & DROPS FEED SCREEN (Interactive 3D Flip Cards)
+// =========================================================================
+
+@Composable
+private fun StudyScreen(
+    app: QuickDropApplication,
+    onStartQuizSetup: (String?) -> Unit,
+    onResumeQuiz: (String) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val activeSession by app.localStore.observeActiveSession().collectAsState(initial = null)
+    val drops by app.localStore.observeApprovedDrops().collectAsState(initial = emptyList())
+    var selectedFilter by rememberSaveable { mutableStateOf("ALL") }
+
+    val filteredDrops = remember(drops, selectedFilter) {
+        when (selectedFilter) {
+            "SAVED" -> drops.filter { it.second.visibilityState == DropVisibilityState.SAVED }
+            "UNDERSTOOD" -> drops.filter { it.second.visibilityState == DropVisibilityState.UNDERSTOOD }
+            "REVIEW" -> drops.filter { it.second.visibilityState == DropVisibilityState.REVIEW }
+            else -> drops
+        }
+    }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Text("Weekly Timetable & Agenda", style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "Time zone: ${app.clock.zoneId().id} • One-off exceptions cancel or move a single date without altering your recurring template.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Active Recall & Micro-Drops",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = QuickDropColors.TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tap cards to flip & inspect verified quotes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = QuickDropColors.TextSecondary
+                    )
+                }
+
+                Button(
+                    onClick = { onStartQuizSetup(null) },
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("10-Q Sprint", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
         }
 
-        if (subjects.isNotEmpty()) {
-            item {
-                val activeSubjId = selectedSubjectId ?: subjects.first().id
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Add Recurring Class Slot", style = MaterialTheme.typography.titleSmall)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            subjects.forEach { subj ->
-                                FilterChip(
-                                    selected = subj.id == activeSubjId,
-                                    onClick = { selectedSubjectId = subj.id },
-                                    label = { Text(subj.name) }
-                                )
-                            }
-                        }
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            val dayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                            dayLabels.forEachIndexed { idx, label ->
-                                val iso = idx + 1
-                                FilterChip(
-                                    selected = selectedWeekdayIso == iso,
-                                    onClick = { selectedWeekdayIso = iso },
-                                    label = { Text(label) }
-                                )
-                            }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = startHour,
-                                onValueChange = { startHour = it },
-                                label = { Text("Start Hour (0-22)") },
-                                modifier = Modifier.weight(1f)
-                            )
-                            OutlinedTextField(
-                                value = endHour,
-                                onValueChange = { endHour = it },
-                                label = { Text("End Hour (1-23)") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        OutlinedTextField(
-                            value = location,
-                            onValueChange = { location = it },
-                            label = { Text("Location") },
-                            modifier = Modifier.fillMaxWidth()
+        // Filter Pills
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    "ALL" to "All Drops (${drops.size})",
+                    "SAVED" to "Saved (${drops.count { it.second.visibilityState == DropVisibilityState.SAVED }})",
+                    "UNDERSTOOD" to "Understood",
+                    "REVIEW" to "Review Due"
+                ).forEach { (key, label) ->
+                    val isSelected = selectedFilter == key
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) QuickDropColors.CosmicSurfaceHighlight else QuickDropColors.CosmicSurfaceElevated)
+                            .border(1.dp, if (isSelected) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(8.dp))
+                            .clickable { selectedFilter = key }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
-                        if (overlapWarningMessage != null) {
-                            Text(
-                                text = overlapWarningMessage!!,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                val sH = (startHour.toIntOrNull() ?: 9).coerceIn(0, 22)
-                                val eH = (endHour.toIntOrNull() ?: (sH + 1)).coerceIn(sH + 1, 23)
-                                scope.launch {
-                                    val (_, warnings) = app.localStore.upsertClassSlot(
-                                        ClassSlot(
-                                            id = java.util.UUID.randomUUID().toString(),
-                                            subjectId = activeSubjId,
-                                            weekdayMask = 1 shl (selectedWeekdayIso - 1),
-                                            startMinuteOfDay = sH * 60,
-                                            endMinuteOfDay = eH * 60,
-                                            zoneId = app.clock.zoneId().id,
-                                            location = location,
-                                            enabled = true,
-                                            reminderEnabled = true,
-                                            reminderLeadMinutes = 15
-                                        )
-                                    )
-                                    overlapWarningMessage = if (warnings.isNotEmpty()) {
-                                        "Note: This slot overlaps with ${warnings.size} existing slot(s). Saved as requested."
-                                    } else {
-                                        null
-                                    }
-                                    app.rescheduleRemindersAsync()
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Save Class Slot")
-                        }
                     }
                 }
             }
         }
 
-        items(slots, key = { it.id }) { slot ->
-            val subject = subjects.find { it.id == slot.subjectId }
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "${subject?.name ?: "Course"} • ${slot.location}",
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Text(
-                        text = "Time: %02d:%02d - %02d:%02d (%s)".format(
-                            slot.startMinuteOfDay / 60,
-                            slot.startMinuteOfDay % 60,
-                            slot.endMinuteOfDay / 60,
-                            slot.endMinuteOfDay % 60,
-                            slot.zoneId
-                        )
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    app.localStore.upsertException(
-                                        ScheduleException(
-                                            id = java.util.UUID.randomUUID().toString(),
-                                            slotId = slot.id,
-                                            originalLocalDateIso = app.clock.localDate().toString(),
-                                            action = ScheduleExceptionAction.CANCEL
-                                        )
-                                    )
-                                    app.rescheduleRemindersAsync()
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Cancel Today Only")
-                        }
-                        TextButton(
-                            onClick = { onOpenSubject(slot.subjectId) },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Subject Detail")
-                        }
+        if (filteredDrops.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .padding(28.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.MenuBook, contentDescription = null, tint = QuickDropColors.TextMuted, modifier = Modifier.size(36.dp))
+                        Text("No Drops matching this filter", color = QuickDropColors.TextSecondary, fontWeight = FontWeight.Bold)
+                        Text("Ingest new lectures in the Upload tab to generate drops", color = QuickDropColors.TextMuted, fontSize = 12.sp)
                     }
                 }
             }
-        }
-
-        if (exceptions.isNotEmpty()) {
-            item {
-                Text("Active Date Exceptions (${exceptions.size})", style = MaterialTheme.typography.titleSmall)
-            }
-            items(exceptions, key = { it.id }) { ex ->
-                AssistChip(
-                    onClick = {
-                        scope.launch { app.localStore.removeException(ex.id) }
+        } else {
+            items(filteredDrops, key = { it.first.id }) { (drop, state) ->
+                InteractiveFlipCard(
+                    topicName = drop.evidenceQuote.take(24).ifBlank { "Core Concept" },
+                    prompt = drop.promptOrBody,
+                    explanation = drop.explanation,
+                    evidenceQuote = drop.evidenceQuote,
+                    anchorText = "${drop.anchorKind ?: "PAGE"} ${drop.anchorIndex ?: 1}",
+                    isSaved = state.visibilityState == DropVisibilityState.SAVED,
+                    onToggleSave = {
+                        val next = if (state.visibilityState == DropVisibilityState.SAVED) DropVisibilityState.UNSEEN else DropVisibilityState.SAVED
+                        scope.launch { app.localStore.updateDropState(drop.id, next) }
                     },
-                    label = { Text("${ex.originalLocalDateIso}: ${ex.action} (Tap to restore)") }
+                    onRateConfidence = { rating ->
+                        scope.launch {
+                            val nextState = when (rating) {
+                                "HARD" -> DropVisibilityState.REVIEW
+                                "GOOD" -> DropVisibilityState.UNDERSTOOD
+                                else -> DropVisibilityState.SAVED
+                            }
+                            app.localStore.updateDropState(drop.id, nextState)
+                        }
+                    }
                 )
             }
         }
     }
 }
+
+// =========================================================================
+// 4. MOBILE PROGRESS & ANALYTICS SCREEN
+// =========================================================================
+
+@Composable
+private fun ProgressScreen(app: QuickDropApplication) {
+    val completedSessions by app.localStore.observeCompletedSessions().collectAsState(initial = emptyList())
+    val reviewStates by app.localStore.observeTopicReviewStates().collectAsState(initial = emptyMap())
+
+    val totalCorrect = completedSessions.sumOf { it.correctCount }
+    val totalAnswered = completedSessions.sumOf { it.answeredCount }
+    val overallAccuracy = if (totalAnswered > 0) (totalCorrect * 100) / totalAnswered else 0
+
+    val newCount = reviewStates.values.count { SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.NEW }
+    val learningCount = reviewStates.values.count { SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.LEARNING }
+    val reviewCount = reviewStates.values.count { SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.DUE }
+    val stableCount = reviewStates.values.count { SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.STABLE }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Spaced Repetition & Recall Analytics", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                Text("SuperMemo SM-2 mastery estimates based on your practice latency and confidence.", style = MaterialTheme.typography.bodySmall, color = QuickDropColors.TextSecondary)
+            }
+        }
+
+        // Hero Accuracy Card
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(18.dp))
+                    .padding(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Cumulative Accuracy", color = QuickDropColors.TextSecondary, fontSize = 12.sp)
+                        Text("$overallAccuracy%", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 28.sp)
+                        Text("$totalCorrect correct of $totalAnswered answered • ${completedSessions.size} sessions", color = QuickDropColors.TextMuted, fontSize = 11.sp)
+                    }
+
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(64.dp)) {
+                        CircularProgressIndicator(
+                            progress = { (overallAccuracy / 100f).coerceIn(0f, 1f) },
+                            modifier = Modifier.size(64.dp),
+                            color = QuickDropColors.Emerald,
+                            trackColor = Color(0x33FFFFFF),
+                            strokeWidth = 6.dp
+                        )
+                        Icon(Icons.Default.Insights, contentDescription = null, tint = QuickDropColors.EmeraldLight, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+        }
+
+        // SM-2 Mastery Distribution
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Topic Mastery Distribution (SM-2)", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MasteryBar("Stable", stableCount, QuickDropColors.Emerald, Modifier.weight(1f))
+                        MasteryBar("Learning", learningCount, QuickDropColors.Cyan, Modifier.weight(1f))
+                        MasteryBar("Review", reviewCount, QuickDropColors.Amber, Modifier.weight(1f))
+                        MasteryBar("New", newCount, QuickDropColors.Violet, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Active Topic Retention Health (${reviewStates.size})", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        if (reviewStates.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Complete your first quiz sprint to generate topic mastery metrics.", color = QuickDropColors.TextMuted, fontSize = 12.sp)
+                }
+            }
+        } else {
+            items(reviewStates.values.toList(), key = { it.topicId }) { state ->
+                val status = SpacedRepetitionScheduler.resolveMasteryStatus(state, app.clock)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Topic: ${state.topicId.take(14)}", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Stability: ${"%.1f".format(state.stabilityDays)}d • Correct: ${state.correctCount}/${state.attemptCount} • Lapses: ${state.lapses}", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    when (status) {
+                                        TopicMasteryStatus.STABLE -> Color(0x3310B981)
+                                        TopicMasteryStatus.LEARNING -> Color(0x3306B6D4)
+                                        TopicMasteryStatus.DUE -> Color(0x33F59E0B)
+                                        else -> Color(0x338B5CF6)
+                                    }
+                                )
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = status.name,
+                                color = when (status) {
+                                    TopicMasteryStatus.STABLE -> QuickDropColors.EmeraldLight
+                                    TopicMasteryStatus.LEARNING -> QuickDropColors.CyanLight
+                                    TopicMasteryStatus.DUE -> QuickDropColors.AmberLight
+                                    else -> QuickDropColors.VioletLight
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MasteryBar(label: String, count: Int, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.15f))
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("$count", color = color, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+            Text(label, color = QuickDropColors.TextSecondary, fontSize = 10.sp)
+        }
+    }
+}
+
+// =========================================================================
+// 5. SUBJECT DETAIL SCREEN
+// =========================================================================
 
 @Composable
 private fun SubjectDetailScreen(
@@ -674,61 +1238,116 @@ private fun SubjectDetailScreen(
     val topics by app.localStore.observeTopicsForSubject(subjectId).collectAsState(initial = emptyList())
     val subject = subjects.find { it.id == subjectId }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(subject?.name ?: "Subject Detail", style = MaterialTheme.typography.headlineSmall)
-                OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Back")
+                Column {
+                    Text(subject?.name ?: "Course Syllabus", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                    Text("${subject?.term ?: "First Semester"} • ${subject?.instructor ?: "Faculty"}", style = MaterialTheme.typography.bodySmall, color = QuickDropColors.TextSecondary)
+                }
+
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp), modifier = Modifier.height(36.dp)) {
+                    Text("Back", fontSize = 12.sp)
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onPrepareQuiz, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Prepare Quiz")
+                Button(
+                    onClick = onPrepareQuiz,
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f).height(42.dp)
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Prepare Quiz", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
-                OutlinedButton(onClick = onAddLecture, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Add Lecture / Material")
+
+                Button(
+                    onClick = onAddLecture,
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Violet),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1.2f).height(42.dp)
+                ) {
+                    Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("+ Add Material", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
 
         item {
-            Text("Topics (${topics.size})", style = MaterialTheme.typography.titleMedium)
-            if (topics.isEmpty()) {
-                Text("No topics created yet. Add a lecture or manual study item.")
+            Text("Lectures & Materials (${lectures.size})", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        if (lectures.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("No lecture materials uploaded yet", color = QuickDropColors.TextSecondary, fontWeight = FontWeight.Bold)
+                        Text("Tap '+ Add Material' above or upload lecture slides", color = QuickDropColors.TextMuted, fontSize = 12.sp)
+                    }
+                }
             }
-        }
+        } else {
+            items(lectures, key = { it.id }) { lecture ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(14.dp))
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(lecture.title, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(lecture.localDateIso, color = QuickDropColors.TextMuted, fontSize = 11.sp)
+                        }
 
-        item {
-            Text("Lectures (Newest First)", style = MaterialTheme.typography.titleMedium)
-        }
+                        if (!lecture.topicLabel.isNullOrBlank()) {
+                            Text("Topic: ${lecture.topicLabel}", color = QuickDropColors.CyanLight, fontSize = 11.sp)
+                        }
 
-        items(lectures, key = { it.id }) { lecture ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("${lecture.localDateIso} — ${lecture.title}", style = MaterialTheme.typography.titleSmall)
-                    if (!lecture.topicLabel.isNullOrBlank()) {
-                        Text("Topic: ${lecture.topicLabel}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (lecture.notes.isNotBlank()) {
-                        Text(lecture.notes.take(140), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = { onReviewMaterial(lecture.id) },
-                        modifier = Modifier.heightIn(min = 48.dp)
-                    ) {
-                        Text("Review Items & Drafts")
+                        if (lecture.notes.isNotBlank()) {
+                            Text(lecture.notes.take(120), color = QuickDropColors.TextSecondary, fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = { onReviewMaterial(lecture.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceHighlight),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().height(36.dp)
+                        ) {
+                            Text("Review Extracted Items & Drops →", fontSize = 11.sp, color = QuickDropColors.TextPrimary)
+                        }
                     }
                 }
             }
         }
     }
 }
+
+// =========================================================================
+// 6. LECTURE EDITOR SCREEN
+// =========================================================================
 
 @Composable
 private fun LectureEditorScreen(
@@ -740,129 +1359,112 @@ private fun LectureEditorScreen(
 ) {
     val scope = rememberCoroutineScope()
     var title by rememberSaveable { mutableStateOf("") }
-    var dateIso by rememberSaveable { mutableStateOf(app.clock.localDate().toString()) }
     var topicLabel by rememberSaveable { mutableStateOf("") }
     var notes by rememberSaveable { mutableStateOf("") }
-    var manualQuestionPrompt by rememberSaveable { mutableStateOf("") }
-    var manualCorrectAnswer by rememberSaveable { mutableStateOf("") }
-    var manualDistractor by rememberSaveable { mutableStateOf("") }
-    var manualExplanation by rememberSaveable { mutableStateOf("") }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var prompt by rememberSaveable { mutableStateOf("") }
+    var explanation by rememberSaveable { mutableStateOf("") }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Text("Add Lecture & Study Content", style = MaterialTheme.typography.titleLarge)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Add Lecture Material", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Cancel") }
+            }
+        }
+
+        item {
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Lecture Title (Required)") },
+                label = { Text("Lecture Title (e.g. Virtual Memory Architecture)") },
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
-                value = dateIso,
-                onValueChange = { dateIso = it },
-                label = { Text("Lecture Date (YYYY-MM-DD)") },
-                modifier = Modifier.fillMaxWidth()
-            )
+        }
+
+        item {
             OutlinedTextField(
                 value = topicLabel,
                 onValueChange = { topicLabel = it },
                 label = { Text("Topic Label (Optional)") },
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+
+        item {
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("Lecture Notes / Paste Excerpt") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3
+                label = { Text("Lecture Summary / Slide Notes") },
+                modifier = Modifier.fillMaxWidth().height(120.dp)
             )
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Manual MCQ Creation (Works Offline Without AI Key)", style = MaterialTheme.typography.titleSmall)
-                    OutlinedTextField(
-                        value = manualQuestionPrompt,
-                        onValueChange = { manualQuestionPrompt = it },
-                        label = { Text("Question Prompt") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = manualCorrectAnswer,
-                        onValueChange = { manualCorrectAnswer = it },
-                        label = { Text("Correct Answer Option") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = manualDistractor,
-                        onValueChange = { manualDistractor = it },
-                        label = { Text("Distractor Option") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = manualExplanation,
-                        onValueChange = { manualExplanation = it },
-                        label = { Text("Explanation") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
-        if (statusMessage != null) {
-            item {
-                Text(statusMessage!!, color = MaterialTheme.colorScheme.primary)
-            }
+            Text("Create Quick Practice Flashcard:", color = QuickDropColors.TextSecondary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        if (title.isBlank()) {
-                            statusMessage = "Lecture title is required."
-                            return@Button
-                        }
-                        scope.launch {
-                            val savedLecture = app.localStore.createOrUpdateLecture(
-                                id = lectureId,
+            OutlinedTextField(
+                value = prompt,
+                onValueChange = { prompt = it },
+                label = { Text("Question or Active Recall Prompt") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            OutlinedTextField(
+                value = explanation,
+                onValueChange = { explanation = it },
+                label = { Text("Answer / Rationale") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            Button(
+                enabled = title.isNotBlank(),
+                onClick = {
+                    scope.launch {
+                        val lec = app.localStore.createOrUpdateLecture(
+                            id = lectureId,
+                            subjectId = subjectId,
+                            title = title,
+                            localDateIso = app.clock.localDate().toString(),
+                            topicLabel = topicLabel.ifBlank { title },
+                            notes = notes
+                        )
+                        if (prompt.isNotBlank()) {
+                            app.localStore.createManualItem(
                                 subjectId = subjectId,
-                                title = title,
-                                localDateIso = dateIso,
-                                topicLabel = topicLabel.ifBlank { title },
-                                notes = notes
+                                topicName = topicLabel.ifBlank { title },
+                                lectureId = lec.id,
+                                kind = LearningItemKind.DROP,
+                                promptOrBody = prompt,
+                                explanation = explanation.ifBlank { "Core concept from $title" },
+                                difficulty = Difficulty.MEDIUM
                             )
-                            if (manualQuestionPrompt.isNotBlank() && manualCorrectAnswer.isNotBlank() && manualDistractor.isNotBlank()) {
-                                app.localStore.createManualItem(
-                                    subjectId = subjectId,
-                                    topicName = topicLabel.ifBlank { title },
-                                    lectureId = savedLecture.id,
-                                    kind = LearningItemKind.MCQ,
-                                    promptOrBody = manualQuestionPrompt,
-                                    explanation = manualExplanation.ifBlank { "Manual study item" },
-                                    difficulty = Difficulty.MEDIUM,
-                                    options = listOf(
-                                        manualCorrectAnswer to true,
-                                        manualDistractor to false
-                                    )
-                                )
-                            }
-                            onOpenMaterialReview(savedLecture.id)
                         }
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) {
-                    Text("Save Lecture")
-                }
-                OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Cancel")
-                }
+                        onOpenMaterialReview(lec.id)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(46.dp)
+            ) {
+                Text("Save Lecture & Review", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
+
+// =========================================================================
+// 7. MATERIAL REVIEW SCREEN
+// =========================================================================
 
 @Composable
 private fun MaterialReviewScreen(
@@ -871,132 +1473,98 @@ private fun MaterialReviewScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val items by app.localStore.observeLearningItemsForLecture(lectureId).collectAsState(initial = emptyList())
-    val aiJobs by app.localStore.observeAiJobs().collectAsState(initial = emptyList())
-    val preferences by app.localStore.observePreferences().collectAsState(initial = UserPreferences())
-    var showConsentDialog by remember { mutableStateOf(false) }
+    val lecture by app.localStore.observeLectureById(lectureId).collectAsState(initial = null)
+    val drafts by app.localStore.observeDraftsForLecture(lectureId).collectAsState(initial = emptyList())
+    val itemsList by app.localStore.observeLearningItemsForLecture(lectureId).collectAsState(initial = emptyList())
 
-    val latestJobForLecture = aiJobs.lastOrNull { it.lectureId == lectureId }
-
-    if (showConsentDialog) {
-        AlertDialog(
-            onDismissRequest = { showConsentDialog = false },
-            title = { Text("Send Selected Text to Google Gemini?") },
-            text = {
-                Text("To generate draft questions and Drops, Quick Drop sends the extracted text from this lecture directly to Google using your Gemini API key. Generated items remain unapproved drafts until you review and approve each one.")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showConsentDialog = false
-                        scope.launch {
-                            app.localStore.updatePreferences { it.copy(cloudTextSubmissionConsentGranted = true) }
-                            val key = app.apiKeyVault.getDecryptedApiKey().orEmpty()
-                            app.localStore.generateDraftsWithAi(
-                                lectureId = lectureId,
-                                apiKey = key,
-                                client = app.activeGeminiClient()
-                            )
-                        }
-                    }
-                ) {
-                    Text("Consent & Generate Drafts")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConsentDialog = false }) {
-                    Text("Stay in Manual Mode")
-                }
-            }
-        )
-    }
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Material & Draft Review", style = MaterialTheme.typography.titleLarge)
-                OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Done")
+                Column {
+                    Text(lecture?.title ?: "Lecture Review", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                    Text("Approved Drops: ${itemsList.size} • Pending Drafts: ${drafts.size}", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
                 }
-            }
-            Text(
-                text = "Only individually approved items enter quizzes or Drops. Bulk approval is disabled by design.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    if (!preferences.cloudTextSubmissionConsentGranted) {
-                        showConsentDialog = true
-                    } else {
-                        scope.launch {
-                            val key = app.apiKeyVault.getDecryptedApiKey().orEmpty()
-                            app.localStore.generateDraftsWithAi(
-                                lectureId = lectureId,
-                                apiKey = key,
-                                client = app.activeGeminiClient()
-                            )
-                        }
-                    }
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Text("Generate Drafts with Gemini (BYOK)")
-            }
-            if (latestJobForLecture != null) {
-                Text(
-                    text = "AI Job State: ${latestJobForLecture.state} • ${latestJobForLecture.sanitizedStatusMessage}",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Done") }
             }
         }
 
-        items(items, key = { it.id }) { item ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "[${item.kind}] Status: ${item.approvalStatus} (v${item.version}) • ${item.difficulty}",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Text(item.promptOrBody, style = MaterialTheme.typography.titleSmall)
-                    if (item.anchorKind != null && item.anchorIndex != null) {
-                        Text(
-                            text = "Source Anchor: ${item.anchorKind} ${item.anchorIndex} | Evidence: \"${item.evidenceQuote}\"",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    item.options.forEach { opt ->
-                        val marker = if (opt.isCorrect) "[Correct Key]" else "[Distractor]"
-                        Text("• $marker ${opt.body}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (item.explanation.isNotBlank()) {
-                        Text("Rationale: ${item.explanation}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (item.approvalStatus == ApprovalStatus.DRAFT) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { scope.launch { app.localStore.approveItem(item.id) } },
-                                modifier = Modifier.heightIn(min = 48.dp)
-                            ) {
-                                Text("Approve Item")
-                            }
-                            OutlinedButton(
-                                onClick = { scope.launch { app.localStore.rejectItem(item.id) } },
-                                modifier = Modifier.heightIn(min = 48.dp)
-                            ) {
-                                Text("Reject")
-                            }
+        if (drafts.isNotEmpty()) {
+            item {
+                Text("Pending AI Drafts (Tap to Approve):", color = QuickDropColors.AmberLight, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+            items(drafts, key = { it.id }) { draft ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .border(1.dp, QuickDropColors.Amber.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(draft.promptOrBody, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Explanation: ${draft.explanation}", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
+                        if (draft.evidenceQuote.isNotBlank()) {
+                            Text("Evidence: \"${draft.evidenceQuote}\"", color = QuickDropColors.EmeraldLight, fontSize = 10.sp)
                         }
+                        Button(
+                            onClick = { scope.launch { app.localStore.approveDraftItem(draft.id) } },
+                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Approve into Drops", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Approved Active Recall Items (${itemsList.size}):", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
+
+        if (itemsList.isEmpty()) {
+            item {
+                Text("No items approved yet.", color = QuickDropColors.TextMuted, fontSize = 12.sp)
+            }
+        } else {
+            items(itemsList, key = { it.id }) { item ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(QuickDropColors.CosmicSurfaceElevated)
+                        .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(14.dp))
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(0x3310B981))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(item.kind.name, color = QuickDropColors.EmeraldLight, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(item.promptOrBody, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Text("Answer: ${item.explanation}", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
                     }
                 }
             }
         }
     }
 }
+
+// =========================================================================
+// 8. QUIZ SETUP SCREEN
+// =========================================================================
 
 @Composable
 private fun QuizSetupScreen(
@@ -1007,63 +1575,111 @@ private fun QuizSetupScreen(
     onSessionStarted: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var requestedCount by rememberSaveable { mutableStateOf(preferences.defaultQuizCount) }
-    var includeOlderTopics by rememberSaveable { mutableStateOf(preferences.includeOlderTopicsByDefault) }
-    var shortPoolNotice by remember { mutableStateOf<String?>(null) }
+    val subjects by app.localStore.observeActiveSubjects().collectAsState(initial = emptyList())
+    var selectedSubjectId by remember { mutableStateOf(primarySubjectId) }
+    var questionCount by remember { mutableStateOf(10) }
+    var isStarting by remember { mutableStateOf(false) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Quiz Setup", style = MaterialTheme.typography.headlineSmall)
-        Text("Defaults loaded from Settings: $requestedCount questions, ${preferences.defaultDifficultyFilter}, untimed, explanations revealed only at the end.")
-
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(5, 10, 15, 20).forEach { count ->
-                FilterChip(
-                    selected = requestedCount == count,
-                    onClick = { requestedCount = count },
-                    label = { Text("$count Qs") }
-                )
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Configure Quiz Sprint", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Cancel") }
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text("Include due & older core topics")
-            Switch(checked = includeOlderTopics, onCheckedChange = { includeOlderTopics = it })
-        }
+        item {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(18.dp))
+                    .padding(18.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text("Select Scope:", color = QuickDropColors.TextSecondary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
 
-        if (shortPoolNotice != null) {
-            Text(shortPoolNotice!!, color = MaterialTheme.colorScheme.error)
-        }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selectedSubjectId == null) Color(0x3310B981) else QuickDropColors.CosmicSurface)
+                            .border(1.dp, if (selectedSubjectId == null) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(10.dp))
+                            .clickable { selectedSubjectId = null }
+                            .padding(12.dp)
+                    ) {
+                        Text("🌐 Cumulative (All Courses & Topics)", color = if (selectedSubjectId == null) QuickDropColors.EmeraldLight else QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        val (session, result) = app.localStore.startNewQuizSession(
-                            scope = QuizScopeSnapshot(
-                                primarySubjectId = primarySubjectId,
-                                includeCrossSubjectReview = preferences.includeCrossSubjectByDefault,
-                                includeOlderTopics = includeOlderTopics,
-                                requestedCount = requestedCount,
-                                difficultyFilter = preferences.defaultDifficultyFilter
-                            )
-                        )
-                        if (session == null) {
-                            shortPoolNotice = "No approved MCQ items available for this scope yet. Add or approve study items first."
-                        } else {
-                            onSessionStarted(session.id)
+                    subjects.forEach { subj ->
+                        val isSelected = subj.id == selectedSubjectId
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) Color(0x3310B981) else QuickDropColors.CosmicSurface)
+                                .border(1.dp, if (isSelected) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(10.dp))
+                                .clickable { selectedSubjectId = subj.id }
+                                .padding(12.dp)
+                        ) {
+                            Text("📚 ${subj.name}", color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Text("Start Quiz")
-            }
-            OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Back")
+
+                    Text("Sprint Size: $questionCount Questions", color = QuickDropColors.TextSecondary, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(5, 10, 15).forEach { count ->
+                            val isSel = questionCount == count
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) QuickDropColors.Emerald else QuickDropColors.CosmicSurface)
+                                    .clickable { questionCount = count }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("$count Questions", color = if (isSel) Color.White else QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    Button(
+                        enabled = !isStarting,
+                        onClick = {
+                            isStarting = true
+                            scope.launch {
+                                val session = app.localStore.createQuizSession(
+                                    scope = QuizScopeSnapshot(
+                                        primarySubjectId = selectedSubjectId,
+                                        requestedCount = questionCount
+                                    )
+                                )
+                                onSessionStarted(session.id)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Start Active Recall Sprint", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
             }
         }
     }
 }
+
+// =========================================================================
+// 9. QUIZ RUNNER SCREEN (Tactile Option Cards & Immediate Flow)
+// =========================================================================
 
 @Composable
 private fun QuizRunnerScreen(
@@ -1074,134 +1690,138 @@ private fun QuizRunnerScreen(
 ) {
     val scope = rememberCoroutineScope()
     val session by app.localStore.observeSessionById(sessionId).collectAsState(initial = null)
-    val responses by app.localStore.observeResponsesForSession(sessionId).collectAsState(initial = emptyList())
-    var selectedOptionId by rememberSaveable { mutableStateOf<String?>(null) }
-
     val currentSession = session ?: return
-    val currentIndex = currentSession.currentQuestionIndex.coerceIn(0, (currentSession.itemIdsInOrder.size - 1).coerceAtLeast(0))
-    val currentItemId = currentSession.itemIdsInOrder.getOrNull(currentIndex) ?: return
 
-    // Look up existing response if student navigated back
-    val existingResponse = responses.find { it.itemId == currentItemId }
-    LaunchedEffect(currentItemId, existingResponse) {
-        selectedOptionId = existingResponse?.selectedOptionId
-    }
+    val currentIndex = currentSession.currentQuestionIndex
+    val itemId = currentSession.itemIdsInOrder.getOrNull(currentIndex)
+    val item by app.localStore.observeItemById(itemId ?: "").collectAsState(initial = null)
 
-    // Observe the item
-    val draftItems by app.localStore.observeDraftItems().collectAsState(initial = emptyList())
-    var currentItem by remember { mutableStateOf<com.quickdrop.core.model.LearningItem?>(null) }
-    LaunchedEffect(currentItemId) {
-        // Export bundle or direct lookup
-        val exported = kotlinx.serialization.json.Json.decodeFromString<com.quickdrop.core.repository.LocalDataExportBundle>(
-            app.localStore.exportLocalDataJson()
-        )
-        currentItem = exported.learningItems.find { it.id == currentItemId }
-    }
+    var selectedOptionId by remember(currentIndex) { mutableStateOf<String?>(null) }
 
-    val item = currentItem ?: return
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        LinearProgressIndicator(
-            progress = { (currentIndex + 1).toFloat() / currentSession.itemIdsInOrder.size.toFloat() },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Question ${currentIndex + 1} of ${currentSession.itemIdsInOrder.size}",
-                style = MaterialTheme.typography.titleMedium
-            )
-            TextButton(onClick = onRequestQuit, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Quit / Pause")
+    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Progress Bar & Header
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Question ${currentIndex + 1} of ${currentSession.itemIdsInOrder.size}",
+                    color = QuickDropColors.TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+                TextButton(onClick = onRequestQuit) {
+                    Text("Pause / Quit", color = QuickDropColors.RoseLight, fontSize = 12.sp)
+                }
             }
-        }
 
-        if (currentSession.scopeSnapshot.actualEligibleCount < currentSession.scopeSnapshot.requestedCount) {
-            Text(
-                text = "Note: Pool had ${currentSession.scopeSnapshot.actualEligibleCount} approved items (requested ${currentSession.scopeSnapshot.requestedCount}).",
-                style = MaterialTheme.typography.labelSmall
+            SegmentedProgressBar(
+                total = currentSession.itemIdsInOrder.size,
+                current = currentIndex
             )
         }
 
-        // Per specification: NEVER reveal correctness or explanation before final results!
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(item.promptOrBody, style = MaterialTheme.typography.titleMedium)
-                item.options.forEach { option ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
+        val curItem = item
+        if (curItem != null) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(20.dp))
+                    .padding(18.dp)
+            ) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    item {
+                        Text(
+                            text = curItem.promptOrBody,
+                            color = QuickDropColors.TextPrimary,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 24.sp
+                        )
+                    }
+
+                    if (curItem.options.isNotEmpty()) {
+                        items(curItem.options) { option ->
+                            val letters = listOf("A", "B", "C", "D", "E")
+                            val idx = curItem.options.indexOf(option)
+                            val label = letters.getOrElse(idx) { "?" }
+
+                            TactileOptionCard(
+                                ordinalLabel = label,
+                                hotkeyHint = "",
+                                body = option.body,
+                                isSelected = selectedOptionId == option.id,
+                                onClick = { selectedOptionId = option.id }
+                            )
+                        }
+                    } else {
+                        item {
+                            Text(
+                                text = "💡 Active Recall Flashcard: Think of the answer in your mind, then tap Submit to proceed.",
+                                color = QuickDropColors.TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Bottom Navigation buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (currentIndex > 0) {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch { app.localStore.navigateQuestion(sessionId, currentIndex - 1) }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f).height(46.dp)
                     ) {
-                        RadioButton(
-                            selected = selectedOptionId == option.id,
-                            onClick = { selectedOptionId = option.id }
-                        )
-                        Text(option.body, modifier = Modifier.padding(start = 8.dp))
+                        Text("Previous", fontSize = 12.sp)
                     }
                 }
-            }
-        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (currentIndex > 0) {
-                OutlinedButton(
+                Button(
+                    enabled = selectedOptionId != null || curItem.options.isEmpty(),
                     onClick = {
-                        scope.launch { app.localStore.navigateQuestion(sessionId, currentIndex - 1) }
+                        scope.launch {
+                            app.localStore.recordAnswer(
+                                sessionId = sessionId,
+                                itemId = curItem.id,
+                                selectedOptionId = selectedOptionId,
+                                latencyMs = 2000L
+                            )
+                            if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) {
+                                app.localStore.completeQuizSession(sessionId)
+                                onQuizCompleted(sessionId)
+                            }
+                        }
                     },
-                    modifier = Modifier.heightIn(min = 48.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1.5f).height(46.dp)
                 ) {
-                    Text("Back")
+                    Text(
+                        text = if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) "Submit Quiz" else "Next Question →",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
-            }
-
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        app.localStore.recordAnswer(
-                            sessionId = sessionId,
-                            itemId = item.id,
-                            selectedOptionId = null, // Skip
-                            latencyMs = 1500L
-                        )
-                        if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) {
-                            app.localStore.completeQuizSession(sessionId)
-                            onQuizCompleted(sessionId)
-                        }
-                    }
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Text("Skip")
-            }
-
-            Button(
-                enabled = selectedOptionId != null,
-                onClick = {
-                    scope.launch {
-                        app.localStore.recordAnswer(
-                            sessionId = sessionId,
-                            itemId = item.id,
-                            selectedOptionId = selectedOptionId,
-                            latencyMs = 2500L
-                        )
-                        if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) {
-                            app.localStore.completeQuizSession(sessionId)
-                            onQuizCompleted(sessionId)
-                        }
-                    }
-                },
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) {
-                Text(if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) "Submit Quiz" else "Next")
             }
         }
     }
 }
+
+// =========================================================================
+// 10. QUIZ RESULTS SCREEN
+// =========================================================================
 
 @Composable
 private fun QuizResultsScreen(
@@ -1212,136 +1832,87 @@ private fun QuizResultsScreen(
 ) {
     val session by app.localStore.observeSessionById(sessionId).collectAsState(initial = null)
     val responses by app.localStore.observeResponsesForSession(sessionId).collectAsState(initial = emptyList())
+    val completed = session ?: return
 
-    val completedSession = session ?: return
+    val accuracy = if (completed.answeredCount > 0) (completed.correctCount * 100) / completed.answeredCount else 0
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Text("Quiz Results", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                text = "Score: ${completedSession.correctCount} / ${completedSession.answeredCount} answered (${completedSession.skippedCount} skipped)",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onRetryDueOrMissed(completedSession.scopeSnapshot.primarySubjectId) },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) {
-                    Text("Review Due / Missed")
-                }
-                OutlinedButton(onClick = onDone, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Back to Home")
-                }
-            }
-        }
-
-        items(responses, key = { it.id }) { resp ->
-            val selectedText = resp.optionsSnapshot.find { it.id == resp.selectedOptionId }?.body ?: "Skipped"
-            val correctText = resp.optionsSnapshot.find { it.isCorrect }?.body ?: ""
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Q${resp.sequence + 1}: ${resp.outcome}",
-                        style = MaterialTheme.typography.labelLarge
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF064E3B), Color(0xFF0F172A))
+                        )
                     )
-                    Text(resp.promptSnapshot, style = MaterialTheme.typography.titleSmall)
-                    Text("Your answer: $selectedText")
-                    Text("Correct key: $correctText")
-                    Text("Explanation: ${resp.explanationSnapshot}", style = MaterialTheme.typography.bodySmall)
-                    Text("Source: ${resp.sourceCitationSnapshot}", style = MaterialTheme.typography.labelSmall)
+                    .border(1.dp, QuickDropColors.Emerald.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .padding(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Sprint Complete! 🎯", color = QuickDropColors.EmeraldLight, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("$accuracy%", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 42.sp)
+                    Text("${completed.correctCount} of ${completed.answeredCount} answered correctly", color = QuickDropColors.TextSecondary, fontSize = 13.sp)
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(
+                            onClick = onDone,
+                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Back to Dashboard", fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { onRetryDueOrMissed(completed.scopeSnapshot.primarySubjectId) },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Retry Missed")
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun StudyScreen(
-    app: QuickDropApplication,
-    onStartQuizSetup: (String?) -> Unit,
-    onResumeQuiz: (String) -> Unit
-) {
-    val scope = rememberCoroutineScope()
-    val activeSession by app.localStore.observeActiveSession().collectAsState(initial = null)
-    val drops by app.localStore.observeApprovedDrops().collectAsState(initial = emptyList())
-    var showSavedOnly by rememberSaveable { mutableStateOf(false) }
-
-    val filteredDrops = if (showSavedOnly) {
-        drops.filter { it.second.visibilityState == DropVisibilityState.SAVED }
-    } else {
-        drops
-    }
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("Study & Drops Feed", style = MaterialTheme.typography.titleLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onStartQuizSetup(null) },
-                    modifier = Modifier.heightIn(min = 48.dp)
-                ) {
-                    Text("Start Cumulative Quiz")
-                }
-                if (activeSession != null) {
-                    OutlinedButton(
-                        onClick = { onResumeQuiz(activeSession!!.id) },
-                        modifier = Modifier.heightIn(min = 48.dp)
+            Text("Detailed Question Review:", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+
+        items(responses) { resp ->
+            val isCorrect = resp.outcome == ResponseOutcome.CORRECT
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, if (isCorrect) QuickDropColors.Emerald.copy(alpha = 0.4f) else QuickDropColors.Rose.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Resume Quiz")
+                        Text("Q${resp.sequence + 1}", color = QuickDropColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (isCorrect) "✓ CORRECT" else "✗ INCORRECT",
+                            color = if (isCorrect) QuickDropColors.EmeraldLight else QuickDropColors.RoseLight,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp
+                        )
                     }
-                }
-            }
-        }
 
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = !showSavedOnly,
-                    onClick = { showSavedOnly = false },
-                    label = { Text("All Approved Drops (${drops.size})") }
-                )
-                FilterChip(
-                    selected = showSavedOnly,
-                    onClick = { showSavedOnly = true },
-                    label = { Text("Saved Drops Offline") }
-                )
-            }
-        }
-
-        items(filteredDrops, key = { it.first.id }) { (dropItem, dropState) ->
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(dropItem.promptOrBody, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "State: ${dropState.visibilityState} • Anchor: ${dropItem.anchorKind ?: "NOTE"} ${dropItem.anchorIndex ?: 1}",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch { app.localStore.updateDropState(dropItem.id, DropVisibilityState.SAVED) }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Save")
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch { app.localStore.updateDropState(dropItem.id, DropVisibilityState.UNDERSTOOD) }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Understood")
-                        }
-                        TextButton(
-                            onClick = {
-                                scope.launch { app.localStore.updateDropState(dropItem.id, DropVisibilityState.REVIEW) }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Review Again")
-                        }
+                    Text(resp.promptSnapshot, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Explanation: ${resp.explanationSnapshot}", color = QuickDropColors.TextSecondary, fontSize = 12.sp)
+                    if (resp.sourceCitationSnapshot.isNotBlank()) {
+                        Text("Source: ${resp.sourceCitationSnapshot}", color = QuickDropColors.CyanLight, fontSize = 10.sp)
                     }
                 }
             }
@@ -1349,48 +1920,9 @@ private fun StudyScreen(
     }
 }
 
-@Composable
-private fun ProgressScreen(app: QuickDropApplication) {
-    val completedSessions by app.localStore.observeCompletedSessions().collectAsState(initial = emptyList())
-    val reviewStates by app.localStore.observeTopicReviewStates().collectAsState(initial = emptyMap())
-
-    val totalCorrect = completedSessions.sumOf { it.correctCount }
-    val totalAnswered = completedSessions.sumOf { it.answeredCount }
-    val overallAccuracy = if (totalAnswered > 0) (totalCorrect * 100) / totalAnswered else 0
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("Recall & Routine Outcomes", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "Note: Topic mastery is a local practice estimate based on spaced repetition intervals, not an academic grade.",
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Completed Quiz Sessions: ${completedSessions.size}", style = MaterialTheme.typography.titleSmall)
-                    Text("Overall Accuracy: $overallAccuracy% ($totalCorrect / $totalAnswered answered)")
-                }
-            }
-        }
-
-        item {
-            Text("Topic Mastery States", style = MaterialTheme.typography.titleMedium)
-        }
-
-        items(reviewStates.values.toList(), key = { it.topicId }) { state ->
-            val status = SpacedRepetitionScheduler.resolveMasteryStatus(state, app.clock)
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Topic ID: ${state.topicId.take(8)} • Status: $status", style = MaterialTheme.typography.titleSmall)
-                    Text("Stability: ${"%.1f".format(state.stabilityDays)} days • Correct: ${state.correctCount}/${state.attemptCount} • Lapses: ${state.lapses}")
-                }
-            }
-        }
-    }
-}
+// =========================================================================
+// 11. SETTINGS SCREEN
+// =========================================================================
 
 @Composable
 private fun SettingsScreen(
@@ -1399,186 +1931,75 @@ private fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var keyInput by rememberSaveable { mutableStateOf("") }
-    var maskedKeyPreview by remember { mutableStateOf(app.apiKeyVault.getMaskedKeyPreview()) }
-    var keyStatusMessage by remember { mutableStateOf<String?>(null) }
-    var exportedJsonPreview by remember { mutableStateOf<String?>(null) }
+    var apiKey by rememberSaveable { mutableStateOf("") }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Settings & Privacy", style = MaterialTheme.typography.headlineSmall)
-                OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Close")
-                }
+                Text("Settings & Privacy", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Done") }
             }
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Appearance Theme", style = MaterialTheme.typography.titleSmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ThemePreference.entries.forEach { theme ->
-                            FilterChip(
-                                selected = preferences.themePreference == theme,
-                                onClick = {
-                                    scope.launch {
-                                        app.localStore.updatePreferences { it.copy(themePreference = theme) }
-                                    }
-                                },
-                                label = { Text(theme.name) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Google Gemini BYOK (Bring Your Own Key)", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("API keys are saved directly into the encrypted Android Keystore. All HTTPS calls go straight to Google APIs with zero proxy servers.", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Gemini API Key (BYOK • Android Keystore AES-GCM)", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = if (maskedKeyPreview != null) {
-                            "Stored Key (Masked): $maskedKeyPreview"
-                        } else {
-                            "No API key configured (Manual study mode active)"
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
                     OutlinedTextField(
-                        value = keyInput,
-                        onValueChange = { keyInput = it },
-                        label = { Text("Add or Replace Gemini API Key") },
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("Gemini API Key (AIzaSy...)") },
+                        placeholder = { Text(app.apiKeyVault.getMaskedKeyPreview()?.ifBlank { "Enter API key" } ?: "Enter API key") },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = {
-                                if (keyInput.isNotBlank()) {
-                                    app.apiKeyVault.saveApiKey(keyInput)
-                                    keyInput = ""
-                                    maskedKeyPreview = app.apiKeyVault.getMaskedKeyPreview()
-                                    keyStatusMessage = "Key encrypted in Android Keystore."
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Save Key")
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val stored = app.apiKeyVault.getDecryptedApiKey().orEmpty()
-                                    val res = app.activeGeminiClient().testConnection(stored, preferences.geminiModelId)
-                                    keyStatusMessage = when (res) {
-                                        is com.quickdrop.core.domain.GeminiResponse.Success -> "Connection verified (${res.modelId})."
-                                        is com.quickdrop.core.domain.GeminiResponse.Failure -> res.sanitizedMessage
-                                    }
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Test")
-                        }
-                        TextButton(
-                            onClick = {
-                                app.apiKeyVault.removeApiKey()
-                                maskedKeyPreview = null
-                                keyStatusMessage = "Key and Keystore alias deleted."
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Remove Key")
-                        }
+
+                    Button(
+                        onClick = {
+                            if (apiKey.isNotBlank()) {
+                                app.apiKeyVault.saveApiKey(apiKey)
+                                statusMessage = "API Key saved securely in Android Keystore!"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Save API Key", fontWeight = FontWeight.Bold)
                     }
-                    if (keyStatusMessage != null) {
-                        Text(keyStatusMessage!!, style = MaterialTheme.typography.bodySmall)
+
+                    if (statusMessage != null) {
+                        Text(statusMessage!!, color = QuickDropColors.EmeraldLight, fontSize = 12.sp)
                     }
                 }
             }
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Reminders & Quiet Hours", style = MaterialTheme.typography.titleSmall)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Class Reminders (Inexact • Best Effort)")
-                        Switch(
-                            checked = preferences.classRemindersEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch {
-                                    app.localStore.updatePreferences { it.copy(classRemindersEnabled = enabled) }
-                                    app.rescheduleRemindersAsync()
-                                }
-                            }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Overnight Quiet Hours (22:00 – 07:00)")
-                        Switch(
-                            checked = preferences.quietHoursEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch {
-                                    app.localStore.updatePreferences { it.copy(quietHoursEnabled = enabled) }
-                                    app.rescheduleRemindersAsync()
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Local Data Export & Permanent Delete", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = "Export includes your subjects, timetable, lectures, approved items, and quiz history in readable JSON. Your Gemini API key is never included in exports.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    exportedJsonPreview = app.localStore.exportLocalDataJson().take(600)
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Export JSON")
-                        }
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    app.localStore.clearAllLocalData()
-                                    maskedKeyPreview = null
-                                    exportedJsonPreview = "All local database records, files, and Keystore aliases cleared."
-                                }
-                            },
-                            modifier = Modifier.heightIn(min = 48.dp)
-                        ) {
-                            Text("Clear All Local Data")
-                        }
-                    }
-                    if (exportedJsonPreview != null) {
-                        Text(exportedJsonPreview!!, style = MaterialTheme.typography.bodySmall)
-                    }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(QuickDropColors.CosmicSurfaceElevated)
+                    .border(1.dp, QuickDropColors.CosmicBorder, RoundedCornerShape(18.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("App Version & Build", color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Quick Drop Mobile v0.0.1 (Build 1)", color = QuickDropColors.EmeraldLight, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Obsidian Cosmic Theme • Local SQLite • SuperMemo SM-2 Spaced Repetition", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
                 }
             }
         }
