@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -244,6 +245,7 @@ fun HeroReadinessCard(
                     onClick = onLaunchPrepQuiz,
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
                     shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(42.dp)
                 ) {
                     Icon(
@@ -252,7 +254,7 @@ fun HeroReadinessCard(
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text("Prep", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Prep", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                 }
             }
         }
@@ -423,35 +425,38 @@ fun InteractiveFlipCard(
                 }
             }
 
-            // Bottom Spaced Repetition Rating Buttons
+            // Bottom Spaced Repetition Rating Buttons (Optimized touch targets & zero clipping)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedButton(
                     onClick = { onRateConfidence("HARD") },
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.weight(1f).height(38.dp)
                 ) {
-                    Text("Review", fontSize = 11.sp, color = QuickDropColors.RoseLight)
+                    Text("Review", fontSize = 11.sp, color = QuickDropColors.RoseLight, maxLines = 1)
                 }
 
                 Button(
                     onClick = { onRateConfidence("GOOD") },
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
-                    modifier = Modifier.weight(1f).height(38.dp)
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier.weight(1.2f).height(38.dp)
                 ) {
-                    Text("Understood", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Understood", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
 
                 Button(
                     onClick = { onRateConfidence("EASY") },
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Violet),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.weight(1f).height(38.dp)
                 ) {
-                    Text("Mastered", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Mastered", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         }

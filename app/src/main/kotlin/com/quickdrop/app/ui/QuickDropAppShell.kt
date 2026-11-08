@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -213,104 +217,119 @@ fun QuickDropAppShell(
     Scaffold(
         containerColor = QuickDropColors.CosmicBackground,
         topBar = {
-            // Sleek Modern Mobile Top App Bar
-            Row(
+            // Sleek Modern Mobile Top App Bar with safe system status bar padding
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(QuickDropColors.CosmicSurface)
-                    .border(1.dp, QuickDropColors.CosmicBorder)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .statusBarsPadding()
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(QuickDropColors.EmeraldGradient),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = "Logo",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(QuickDropColors.EmeraldGradient),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = "Logo",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "Quick Drop",
+                                    color = QuickDropColors.TextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0x3310B981))
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text("PRO", color = QuickDropColors.EmeraldLight, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Text(
+                                text = when (activeScreen) {
+                                    ActiveScreen.MainTabs -> selectedTab.label
+                                    is ActiveScreen.SubjectDetail -> "Course Syllabus"
+                                    is ActiveScreen.LectureEditor -> "Lecture Editor"
+                                    is ActiveScreen.MaterialReview -> "Review Extracted Drops"
+                                    is ActiveScreen.QuizSetup -> "Configure Quiz Sprint"
+                                    is ActiveScreen.QuizRunner -> "Active Recall Session"
+                                    is ActiveScreen.QuizResults -> "Quiz Results"
+                                    ActiveScreen.Settings -> "Settings & Privacy"
+                                },
+                                color = QuickDropColors.TextMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
 
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "Quick Drop",
-                                color = QuickDropColors.TextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0x3310B981))
-                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (activeScreen != ActiveScreen.MainTabs) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (activeScreen is ActiveScreen.QuizRunner) {
+                                        showQuitQuizConfirmDialog = true
+                                    } else {
+                                        activeScreen = ActiveScreen.MainTabs
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                             ) {
-                                Text("PRO", color = QuickDropColors.EmeraldLight, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.ArrowBack, contentDescription = "Back", modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Back", fontSize = 11.sp)
                             }
                         }
-                        Text(
-                            text = when (activeScreen) {
-                                ActiveScreen.MainTabs -> selectedTab.label
-                                is ActiveScreen.SubjectDetail -> "Course Syllabus"
-                                is ActiveScreen.LectureEditor -> "Lecture Editor"
-                                is ActiveScreen.MaterialReview -> "Review Extracted Drops"
-                                is ActiveScreen.QuizSetup -> "Configure Quiz Sprint"
-                                is ActiveScreen.QuizRunner -> "Active Recall Session"
-                                is ActiveScreen.QuizResults -> "Quiz Results"
-                                ActiveScreen.Settings -> "Settings & Privacy"
-                            },
-                            color = QuickDropColors.TextMuted,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (activeScreen != ActiveScreen.MainTabs) {
-                        OutlinedButton(
-                            onClick = {
-                                if (activeScreen is ActiveScreen.QuizRunner) {
-                                    showQuitQuizConfirmDialog = true
-                                } else {
-                                    activeScreen = ActiveScreen.MainTabs
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        IconButton(
+                            onClick = { activeScreen = ActiveScreen.Settings },
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", modifier = Modifier.size(13.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Back", fontSize = 11.sp)
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = if (activeScreen is ActiveScreen.Settings) QuickDropColors.Emerald else QuickDropColors.TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
-
-                    IconButton(
-                        onClick = { activeScreen = ActiveScreen.Settings },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = if (activeScreen is ActiveScreen.Settings) QuickDropColors.Emerald else QuickDropColors.TextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(QuickDropColors.CosmicBorder)
+                )
             }
         },
         bottomBar = {
@@ -508,43 +527,47 @@ private fun HomeScreen(
                     onClick = onOpenTimetable,
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(44.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.height(40.dp)
                 ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = QuickDropColors.Emerald, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Upload Timetable File", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Upload Timetable", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
 
                 Button(
                     onClick = onOpenUpload,
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(44.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.height(40.dp)
                 ) {
                     Icon(Icons.Default.FileUpload, contentDescription = null, tint = QuickDropColors.Violet, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Upload Slides (PDF/HTML)", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Upload Slides", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
 
                 Button(
                     onClick = { onOpenQuizSetup(null) },
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceElevated),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(44.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.height(40.dp)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, tint = QuickDropColors.Amber, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("10-Q Sprint", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("10-Q Sprint", color = QuickDropColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
 
                 OutlinedButton(
                     onClick = { showNewSubjectDialog = true },
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(44.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.height(40.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("+ Course", fontSize = 11.sp)
+                    Text("+ Course", fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -776,30 +799,33 @@ private fun HomeScreen(
                         OutlinedButton(
                             onClick = { onAddLecture(subj.id) },
                             shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             modifier = Modifier.weight(1f).height(38.dp)
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(13.dp), tint = QuickDropColors.VioletLight)
                             Spacer(Modifier.width(4.dp))
-                            Text("+ Upload", fontSize = 11.sp, color = QuickDropColors.VioletLight)
+                            Text("+ Upload", fontSize = 11.sp, color = QuickDropColors.VioletLight, maxLines = 1)
                         }
 
                         OutlinedButton(
                             onClick = { onOpenSubject(subj.id) },
                             shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             modifier = Modifier.weight(1f).height(38.dp)
                         ) {
-                            Text("Lectures", fontSize = 11.sp)
+                            Text("Lectures", fontSize = 11.sp, maxLines = 1)
                         }
 
                         Button(
                             onClick = { onOpenQuizSetup(subj.id) },
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                             modifier = Modifier.weight(1f).height(38.dp)
                         ) {
                             Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(13.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Quiz", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Quiz", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
                 }
@@ -943,12 +969,11 @@ private fun StudyScreen(
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Active Recall & Micro-Drops",
                         style = MaterialTheme.typography.titleLarge,
@@ -965,23 +990,32 @@ private fun StudyScreen(
                 Button(
                     onClick = { onStartQuizSetup(null) },
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
                 ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("10-Q Sprint", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Start 10-Question Recall Sprint", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
 
-        // Filter Pills
+        // Filter Pills (Responsive & Horizontally Scrollable)
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 listOf(
                     "ALL" to "All Drops (${drops.size})",
                     "SAVED" to "Saved (${drops.count { it.second.visibilityState == DropVisibilityState.SAVED }})",
-                    "UNDERSTOOD" to "Understood",
-                    "REVIEW" to "Review Due"
+                    "UNDERSTOOD" to "Understood (${drops.count { it.second.visibilityState == DropVisibilityState.UNDERSTOOD }})",
+                    "REVIEW" to "Review Due (${drops.count { it.second.visibilityState == DropVisibilityState.REVIEW }})"
                 ).forEach { (key, label) ->
                     val isSelected = selectedFilter == key
                     Box(
@@ -990,13 +1024,14 @@ private fun StudyScreen(
                             .background(if (isSelected) QuickDropColors.CosmicSurfaceHighlight else QuickDropColors.CosmicSurfaceElevated)
                             .border(1.dp, if (isSelected) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(8.dp))
                             .clickable { selectedFilter = key }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
                     ) {
                         Text(
                             text = label,
                             color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextSecondary,
                             fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1
                         )
                     }
                 }
@@ -1245,13 +1280,20 @@ private fun SubjectDetailScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(subject?.name ?: "Course Syllabus", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
                     Text("${subject?.term ?: "First Semester"} • ${subject?.instructor ?: "Faculty"}", style = MaterialTheme.typography.bodySmall, color = QuickDropColors.TextSecondary)
                 }
 
-                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp), modifier = Modifier.height(36.dp)) {
-                    Text("Back", fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+
+                OutlinedButton(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text("Back", fontSize = 12.sp, maxLines = 1)
                 }
             }
 
@@ -1262,22 +1304,24 @@ private fun SubjectDetailScreen(
                     onClick = onPrepareQuiz,
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1f).height(42.dp)
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Prepare Quiz", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Prepare Quiz", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                 }
 
                 Button(
                     onClick = onAddLecture,
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Violet),
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1.2f).height(42.dp)
                 ) {
                     Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("+ Add Material", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("+ Add Material", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                 }
             }
         }
@@ -1484,11 +1528,19 @@ private fun MaterialReviewScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(lecture?.title ?: "Lecture Review", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold)
-                    Text("Approved Drops: ${itemsList.size} • Pending Drafts: ${drafts.size}", color = QuickDropColors.TextSecondary, fontSize = 11.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(lecture?.title ?: "Lecture Review", style = MaterialTheme.typography.titleLarge, color = QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("Approved Drops: ${itemsList.size} • Pending Drafts: ${drafts.size}", color = QuickDropColors.TextSecondary, fontSize = 11.sp, maxLines = 1)
                 }
-                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Done") }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text("Done", fontSize = 12.sp, maxLines = 1)
+                }
             }
         }
 
@@ -1782,9 +1834,10 @@ private fun QuizRunnerScreen(
                             scope.launch { app.localStore.navigateQuestion(sessionId, currentIndex - 1) }
                         },
                         shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier.weight(1f).height(46.dp)
                     ) {
-                        Text("Previous", fontSize = 12.sp)
+                        Text("Previous", fontSize = 12.sp, maxLines = 1)
                     }
                 }
 
@@ -1806,12 +1859,14 @@ private fun QuizRunnerScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
                     shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.weight(1.5f).height(46.dp)
                 ) {
                     Text(
                         text = if (currentIndex + 1 >= currentSession.itemIdsInOrder.size) "Submit Quiz" else "Next Question →",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1
                     )
                 }
             }

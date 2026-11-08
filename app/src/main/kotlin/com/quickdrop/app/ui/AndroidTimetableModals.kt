@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -348,11 +349,12 @@ fun AndroidUploadTimetableFileModal(
                         onImportComplete()
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald)
+                colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Import ${recognizedSlots.size} Slots into Timetable", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Import (${recognizedSlots.size} Slots)", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
             }
         },
         dismissButton = {

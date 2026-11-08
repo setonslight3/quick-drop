@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -279,21 +280,23 @@ fun WeeklyTimetableBoard(
                                 onClick = onUploadClick,
                                 colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
                                 shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier
                             ) {
                                 Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("📂 Upload Timetable (HTML/ICS)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("📂 Upload Timetable (HTML/ICS)", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                             }
 
                             OutlinedButton(
                                 onClick = onLoadDefaultTemplate,
                                 shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 modifier = if (isCompact) Modifier.fillMaxWidth() else Modifier
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp), tint = QuickDropColors.CyanLight)
                                 Spacer(Modifier.width(6.dp))
-                                Text("🪄 200L Schedule Template", fontSize = 12.sp, color = QuickDropColors.CyanLight)
+                                Text("🪄 200L Schedule Template", fontSize = 12.sp, color = QuickDropColors.CyanLight, maxLines = 1)
                             }
                         }
                     }
