@@ -12,6 +12,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,12 +37,15 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,6 +66,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quickdrop.app.ui.theme.QuickDropColors
@@ -79,6 +86,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AndroidFileIngestionStudio(
     store: QuickDropLocalStore,
@@ -151,6 +159,16 @@ fun AndroidFileIngestionStudio(
                         }
                         if (pack.topic?.isNotBlank() == true) {
                             topicLabel = pack.topic!!
+                        }
+                        // Auto-match subject if available
+                        val packCourseKeywords = listOfNotNull(pack.courseCode, pack.courseName).filter { it.isNotBlank() }
+                        val match = subjects.find { subj ->
+                            packCourseKeywords.any { kw ->
+                                subj.name.contains(kw, ignoreCase = true) || kw.contains(subj.name, ignoreCase = true)
+                            }
+                        }
+                        if (match != null) {
+                            selectedSubjectId = match.id
                         }
                         statusMessage = "Loaded $name: ${pack.drops.size} Drops and ${pack.questions.size} MCQs ready to import!"
                         isErrorMessage = false
@@ -331,19 +349,23 @@ fun AndroidFileIngestionStudio(
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Violet),
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1.3f)
+                                modifier = Modifier.weight(1.3f).heightIn(min = 44.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Copy Chatbot Prompt", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Copy Chatbot Prompt", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
                             }
 
                             OutlinedButton(
                                 onClick = { showSampleJsonDialog = true },
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
-                                Text("View Schema", fontSize = 12.sp, color = QuickDropColors.VioletLight)
+                                Icon(Icons.Default.DataObject, contentDescription = null, modifier = Modifier.size(15.dp), tint = QuickDropColors.VioletLight)
+                                Spacer(Modifier.width(4.dp))
+                                Text("View Schema", fontSize = 11.sp, maxLines = 1, color = QuickDropColors.VioletLight, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -379,56 +401,30 @@ fun AndroidFileIngestionStudio(
                             )
                         }
 
-                        // Target Course Selector
-                        Text("Target Course:", color = QuickDropColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        LazyColumn(modifier = Modifier.heightIn(max = 120.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(subjects) { subj ->
-                                val isSelected = subj.id == selectedSubjectId
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x3310B981) else QuickDropColors.CosmicSurface)
-                                        .border(1.dp, if (isSelected) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(10.dp))
-                                        .clickable { selectedSubjectId = subj.id }
-                                        .padding(10.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(subj.name, color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        if (isSelected) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = QuickDropColors.Emerald, modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         // Two Ways to Import: Browse file or Paste text
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
                                 onClick = { jsonFilePickerLauncher.launch("*/*") },
                                 colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceHighlight),
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
                                 Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp), tint = QuickDropColors.EmeraldLight)
                                 Spacer(Modifier.width(6.dp))
-                                Text("Browse .JSON", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = QuickDropColors.TextPrimary)
+                                Text("Browse JSON", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, color = QuickDropColors.TextPrimary)
                             }
 
                             Button(
                                 onClick = { showJsonPasteBox = !showJsonPasteBox },
                                 colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.CosmicSurfaceHighlight),
                                 shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                             ) {
                                 Icon(Icons.Default.DataObject, contentDescription = null, modifier = Modifier.size(16.dp), tint = QuickDropColors.CyanLight)
                                 Spacer(Modifier.width(6.dp))
-                                Text(if (showJsonPasteBox) "Hide Paste Box" else "Paste Text", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = QuickDropColors.TextPrimary)
+                                Text(if (showJsonPasteBox) "Hide Paste Box" else "Paste Text", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, color = QuickDropColors.TextPrimary)
                             }
                         }
 
@@ -440,8 +436,24 @@ fun AndroidFileIngestionStudio(
                                     if (it.isNotBlank()) {
                                         val res = QuestionPackParser.parse(it)
                                         if (res.isSuccess) {
-                                            parsedPack = res.getOrThrow()
-                                            statusMessage = "Valid JSON: ${parsedPack!!.drops.size} Drops and ${parsedPack!!.questions.size} MCQs detected!"
+                                            val pack = res.getOrThrow()
+                                            parsedPack = pack
+                                            if (pack.lectureTitle?.isNotBlank() == true) {
+                                                lectureTitle = pack.lectureTitle!!
+                                            }
+                                            if (pack.topic?.isNotBlank() == true) {
+                                                topicLabel = pack.topic!!
+                                            }
+                                            val packCourseKeywords = listOfNotNull(pack.courseCode, pack.courseName).filter { kw -> kw.isNotBlank() }
+                                            val match = subjects.find { subj ->
+                                                packCourseKeywords.any { kw ->
+                                                    subj.name.contains(kw, ignoreCase = true) || kw.contains(subj.name, ignoreCase = true)
+                                                }
+                                            }
+                                            if (match != null) {
+                                                selectedSubjectId = match.id
+                                            }
+                                            statusMessage = "Valid JSON: ${pack.drops.size} Drops and ${pack.questions.size} MCQs detected!"
                                             isErrorMessage = false
                                         } else {
                                             statusMessage = "JSON error: ${res.exceptionOrNull()?.message}"
@@ -451,6 +463,64 @@ fun AndroidFileIngestionStudio(
                                 },
                                 label = { Text("Paste JSON from ChatGPT / Claude here") },
                                 modifier = Modifier.fillMaxWidth().height(140.dp)
+                            )
+                        }
+
+                        // Detected Pack Course Banner
+                        if (parsedPack != null && (!parsedPack!!.courseCode.isNullOrBlank() || !parsedPack!!.courseName.isNullOrBlank())) {
+                            val detectedCourse = listOfNotNull(parsedPack!!.courseCode, parsedPack!!.courseName).filter { it.isNotBlank() }.joinToString(" - ")
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0x2210B981))
+                                    .border(1.dp, QuickDropColors.Emerald.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.School, contentDescription = null, tint = QuickDropColors.EmeraldLight, modifier = Modifier.size(18.dp))
+                                    Column {
+                                        Text("Course Detected in Pack:", color = QuickDropColors.EmeraldLight, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(detectedCourse, color = QuickDropColors.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Target Course Selector
+                        if (subjects.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Assign to Course:", color = QuickDropColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    subjects.forEach { subj ->
+                                        val isSelected = subj.id == selectedSubjectId
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { selectedSubjectId = if (isSelected) "" else subj.id },
+                                            label = { Text(subj.name, fontSize = 11.sp, maxLines = 1) },
+                                            leadingIcon = if (isSelected) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                            } else null,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = QuickDropColors.Emerald.copy(alpha = 0.25f),
+                                                selectedLabelColor = QuickDropColors.EmeraldLight,
+                                                selectedLeadingIconColor = QuickDropColors.Emerald
+                                            ),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (parsedPack == null) {
+                            Text(
+                                "💡 Upload a JSON pack or add a course in Timetable. If a pack has course info, Quick Drop will auto-create the course for you.",
+                                color = QuickDropColors.TextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
                             )
                         }
 
@@ -481,19 +551,46 @@ fun AndroidFileIngestionStudio(
                         }
 
                         // Submit Button for JSON Ingestion
+                        val canSubmitJson = !isProcessing && parsedPack != null && (parsedPack!!.drops.isNotEmpty() || parsedPack!!.questions.isNotEmpty())
                         Button(
-                            enabled = !isProcessing && selectedSubjectId.isNotBlank() && parsedPack != null && (parsedPack!!.drops.isNotEmpty() || parsedPack!!.questions.isNotEmpty()),
+                            enabled = canSubmitJson,
                             onClick = {
                                 isProcessing = true
                                 scope.launch {
                                     try {
                                         val pack = parsedPack!!
-                                        val effectiveTitle = lectureTitle.ifBlank { pack.lectureTitle ?: "Lecture Study Pack" }
-                                        val effectiveTopic = topicLabel.ifBlank { pack.topic ?: effectiveTitle }
+                                        val effectiveTitle = lectureTitle.ifBlank { pack.lectureTitle?.ifBlank { null } ?: "Lecture Study Pack" }
+                                        val effectiveTopic = topicLabel.ifBlank { pack.topic?.ifBlank { null } ?: effectiveTitle }
 
                                         val (lecture, count) = withContext(Dispatchers.IO) {
+                                            val targetSubjectId = if (selectedSubjectId.isNotBlank()) {
+                                                selectedSubjectId
+                                            } else {
+                                                val packSubjectName = when {
+                                                    !pack.courseCode.isNullOrBlank() && !pack.courseName.isNullOrBlank() -> "${pack.courseCode} - ${pack.courseName}"
+                                                    !pack.courseCode.isNullOrBlank() -> pack.courseCode!!
+                                                    !pack.courseName.isNullOrBlank() -> pack.courseName!!
+                                                    subjects.isNotEmpty() -> subjects.first().name
+                                                    else -> "CYB 203 - Cybercrime, Law & Countermeasures"
+                                                }
+                                                val existing = subjects.find { it.name.equals(packSubjectName, ignoreCase = true) }
+                                                if (existing != null) {
+                                                    existing.id
+                                                } else {
+                                                    val newSubj = store.createOrUpdateSubject(
+                                                        id = null,
+                                                        name = packSubjectName,
+                                                        colorKey = "emerald",
+                                                        iconKey = "security",
+                                                        term = "First Semester 2026/2027",
+                                                        instructor = "Course Faculty"
+                                                    )
+                                                    newSubj.id
+                                                }
+                                            }
+
                                             val createdLecture = store.createOrUpdateLecture(
-                                                subjectId = selectedSubjectId,
+                                                subjectId = targetSubjectId,
                                                 title = effectiveTitle,
                                                 localDateIso = clock.localDate().toString(),
                                                 topicLabel = effectiveTopic,
@@ -505,7 +602,7 @@ fun AndroidFileIngestionStudio(
                                             // Add Drops
                                             for (d in pack.drops) {
                                                 store.createManualItem(
-                                                    subjectId = selectedSubjectId,
+                                                    subjectId = targetSubjectId,
                                                     topicName = effectiveTopic,
                                                     lectureId = createdLecture.id,
                                                     kind = LearningItemKind.DROP,
@@ -522,7 +619,7 @@ fun AndroidFileIngestionStudio(
                                                     optText to (idx == q.correctIndex)
                                                 }
                                                 store.createManualItem(
-                                                    subjectId = selectedSubjectId,
+                                                    subjectId = targetSubjectId,
                                                     topicName = effectiveTopic,
                                                     lectureId = createdLecture.id,
                                                     kind = LearningItemKind.MCQ,
@@ -539,7 +636,7 @@ fun AndroidFileIngestionStudio(
 
                                         createdLectureId = lecture.id
                                         generatedItemCount = count
-                                        statusMessage = "Successfully imported $count active recall questions & drops! (Zero API tokens consumed)"
+                                        statusMessage = "🎉 Successfully imported $count active recall questions & drops! (Zero API tokens consumed)"
                                         isErrorMessage = false
                                     } catch (t: Throwable) {
                                         statusMessage = "Import failed: ${t.message}"
@@ -549,28 +646,57 @@ fun AndroidFileIngestionStudio(
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = QuickDropColors.Emerald,
+                                disabledContainerColor = QuickDropColors.CosmicSurfaceHighlight.copy(alpha = 0.5f),
+                                disabledContentColor = QuickDropColors.TextMuted
+                            ),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(46.dp)
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             if (isProcessing) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Importing Questions...", fontWeight = FontWeight.Bold)
+                                Text("Importing Questions...", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             } else {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("⚡ Ingest JSON Pack & Save Drops (0 Tokens)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (parsedPack != null) {
+                                            "⚡ Ingest Pack (${parsedPack!!.drops.size} Drops, ${parsedPack!!.questions.size} MCQs)"
+                                        } else {
+                                            "⚡ Ingest JSON Pack & Save Drops (0 Tokens)"
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
 
                         if (statusMessage != null) {
-                            Text(
-                                text = statusMessage!!,
-                                color = if (isErrorMessage) QuickDropColors.RoseLight else QuickDropColors.EmeraldLight,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isErrorMessage) QuickDropColors.Rose.copy(alpha = 0.15f) else QuickDropColors.Emerald.copy(alpha = 0.15f))
+                                    .border(1.dp, if (isErrorMessage) QuickDropColors.Rose.copy(alpha = 0.4f) else QuickDropColors.Emerald.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = statusMessage!!,
+                                    color = if (isErrorMessage) QuickDropColors.RoseLight else QuickDropColors.EmeraldLight,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
                         }
 
                         if (createdLectureId != null) {
@@ -659,29 +785,30 @@ fun AndroidFileIngestionStudio(
                         .padding(18.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Target Course:", color = QuickDropColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-
-                        LazyColumn(modifier = Modifier.heightIn(max = 120.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(subjects) { subj ->
-                                val isSelected = subj.id == selectedSubjectId
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (isSelected) Color(0x3310B981) else QuickDropColors.CosmicSurface)
-                                        .border(1.dp, if (isSelected) QuickDropColors.Emerald else QuickDropColors.CosmicBorder, RoundedCornerShape(10.dp))
-                                        .clickable { selectedSubjectId = subj.id }
-                                        .padding(10.dp)
+                        if (subjects.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Target Course:", color = QuickDropColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(subj.name, color = if (isSelected) QuickDropColors.EmeraldLight else QuickDropColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        if (isSelected) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = QuickDropColors.Emerald, modifier = Modifier.size(16.dp))
-                                        }
+                                    subjects.forEach { subj ->
+                                        val isSelected = subj.id == selectedSubjectId
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { selectedSubjectId = if (isSelected) "" else subj.id },
+                                            label = { Text(subj.name, fontSize = 11.sp, maxLines = 1) },
+                                            leadingIcon = if (isSelected) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                            } else null,
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = QuickDropColors.Emerald.copy(alpha = 0.25f),
+                                                selectedLabelColor = QuickDropColors.EmeraldLight,
+                                                selectedLeadingIconColor = QuickDropColors.Emerald
+                                            ),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
                                     }
                                 }
                             }
@@ -719,23 +846,34 @@ fun AndroidFileIngestionStudio(
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = QuickDropColors.Emerald)
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = QuickDropColors.Emerald, strokeWidth = 2.dp)
                                 Spacer(Modifier.width(10.dp))
                                 Text("Grounded Gemini AI is generating active recall drops...", color = QuickDropColors.TextSecondary, fontSize = 12.sp)
                             }
                         }
 
                         if (statusMessage != null) {
-                            Text(
-                                text = statusMessage!!,
-                                color = if (isErrorMessage) QuickDropColors.RoseLight else QuickDropColors.EmeraldLight,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isErrorMessage) QuickDropColors.Rose.copy(alpha = 0.15f) else QuickDropColors.Emerald.copy(alpha = 0.15f))
+                                    .border(1.dp, if (isErrorMessage) QuickDropColors.Rose.copy(alpha = 0.4f) else QuickDropColors.Emerald.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = statusMessage!!,
+                                    color = if (isErrorMessage) QuickDropColors.RoseLight else QuickDropColors.EmeraldLight,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
                         }
 
+                        val canSubmitDirect = !isProcessing && (fileBytes != null || manualNotes.isNotBlank() || lectureTitle.isNotBlank())
                         Button(
-                            enabled = !isProcessing && selectedSubjectId.isNotBlank() && (fileBytes != null || manualNotes.isNotBlank() || lectureTitle.isNotBlank()),
+                            enabled = canSubmitDirect,
                             onClick = {
                                 // 1. Strict Check for API Key
                                 val apiKey = apiKeyVault.getDecryptedApiKey()
@@ -751,6 +889,21 @@ fun AndroidFileIngestionStudio(
                                         val topic = topicLabel.ifBlank { title }
 
                                         val (lecture, count, statusText) = withContext(Dispatchers.IO) {
+                                            val targetSubjectId = if (selectedSubjectId.isNotBlank()) {
+                                                selectedSubjectId
+                                            } else {
+                                                val fallbackName = lectureTitle.ifBlank { selectedFileName?.substringBeforeLast(".") ?: "General Studies" }.take(30)
+                                                val existing = subjects.find { it.name.equals(fallbackName, ignoreCase = true) }
+                                                existing?.id ?: store.createOrUpdateSubject(
+                                                    id = null,
+                                                    name = fallbackName,
+                                                    colorKey = "emerald",
+                                                    iconKey = "code",
+                                                    term = "First Semester 2026/2027",
+                                                    instructor = "Course Faculty"
+                                                ).id
+                                            }
+
                                             // Extract file chunks
                                             var outcomeChunks: List<com.quickdrop.core.model.SourceChunk> = emptyList()
                                             var notesText = manualNotes.trim()
@@ -768,7 +921,7 @@ fun AndroidFileIngestionStudio(
                                             }
 
                                             val createdLecture = store.createOrUpdateLecture(
-                                                subjectId = selectedSubjectId,
+                                                subjectId = targetSubjectId,
                                                 title = title,
                                                 localDateIso = clock.localDate().toString(),
                                                 topicLabel = topic,
@@ -824,13 +977,18 @@ fun AndroidFileIngestionStudio(
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = QuickDropColors.Emerald),
-                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = QuickDropColors.Emerald,
+                                disabledContainerColor = QuickDropColors.CosmicSurfaceHighlight.copy(alpha = 0.5f),
+                                disabledContentColor = QuickDropColors.TextMuted
+                            ),
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Generate Questions with Gemini AI", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Generate Questions with Gemini AI", fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
                         }
 
                         if (createdLectureId != null) {
