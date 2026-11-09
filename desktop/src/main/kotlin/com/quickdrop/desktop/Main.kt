@@ -175,162 +175,6 @@ fun main() = application {
     val store = remember { QuickDropLocalStore(clock, onClearKeystoreKey = { keyVault.removeApiKey() }) }
     val geminiClient = remember { FakeGeminiClient() }
 
-    // Seed realistic multi-course syllabus on initial launch
-    LaunchedEffect(Unit) {
-        // Course 1: Operating Systems
-        val os = store.createOrUpdateSubject(
-            name = "Operating Systems",
-            colorKey = "emerald",
-            iconKey = "memory",
-            term = "Fall 2026",
-            instructor = "Prof. Chen"
-        )
-        store.upsertClassSlot(
-            ClassSlot(
-                id = "slot-os",
-                subjectId = os.id,
-                weekdayMask = 1 or 4 or 16, // Mon, Wed, Fri
-                startMinuteOfDay = 10 * 60,
-                endMinuteOfDay = 11 * 60 + 30,
-                zoneId = clock.zoneId().id,
-                location = "Turing Hall 204",
-                enabled = true,
-                reminderEnabled = true,
-                reminderLeadMinutes = 15
-            )
-        )
-        val osLec = store.createOrUpdateLecture(
-            subjectId = os.id,
-            title = "Virtual Memory & Paging Tables",
-            localDateIso = clock.localDate().toString(),
-            topicLabel = "Virtual Memory",
-            notes = "Virtual memory maps virtual addresses to physical pages. A Translation Lookaside Buffer (TLB) caches recent virtual-to-physical address translations to prevent redundant multi-level page table traversals."
-        )
-        store.createManualItem(
-            subjectId = os.id,
-            topicName = "Virtual Memory",
-            lectureId = osLec.id,
-            kind = LearningItemKind.MCQ,
-            promptOrBody = "Which high-speed hardware cache directly speeds up virtual-to-physical address translation?",
-            explanation = "The Translation Lookaside Buffer (TLB) caches page table entries directly on the MMU.",
-            difficulty = Difficulty.MEDIUM,
-            options = listOf(
-                "Translation Lookaside Buffer (TLB)" to true,
-                "Interrupt Descriptor Table (IDT)" to false,
-                "Direct Memory Access (DMA) Controller" to false,
-                "Instruction Reorder Buffer" to false
-            )
-        )
-        store.createManualItem(
-            subjectId = os.id,
-            topicName = "Virtual Memory",
-            lectureId = osLec.id,
-            kind = LearningItemKind.DROP,
-            promptOrBody = "A TLB hit satisfies virtual address translation in a single clock cycle without accessing main memory.",
-            explanation = "Core OS Virtual Memory Architecture",
-            difficulty = Difficulty.EASY
-        )
-
-        // Course 2: Distributed Systems
-        val dist = store.createOrUpdateSubject(
-            name = "Distributed Systems",
-            colorKey = "violet",
-            iconKey = "cloud",
-            term = "Fall 2026",
-            instructor = "Dr. Miller"
-        )
-        store.upsertClassSlot(
-            ClassSlot(
-                id = "slot-dist",
-                subjectId = dist.id,
-                weekdayMask = 2 or 8, // Tue, Thu
-                startMinuteOfDay = 14 * 60,
-                endMinuteOfDay = 15 * 60 + 30,
-                zoneId = clock.zoneId().id,
-                location = "Cyber Lab 102",
-                enabled = true,
-                reminderEnabled = true,
-                reminderLeadMinutes = 20
-            )
-        )
-        val distLec = store.createOrUpdateLecture(
-            subjectId = dist.id,
-            title = "Raft Consensus & Quorum Elections",
-            localDateIso = clock.localDate().toString(),
-            topicLabel = "Raft Consensus",
-            notes = "Raft achieves fault-tolerant consensus by electing a single leader per term through randomized election timers and majority quorum votes."
-        )
-        store.createManualItem(
-            subjectId = dist.id,
-            topicName = "Raft Consensus",
-            lectureId = distLec.id,
-            kind = LearningItemKind.MCQ,
-            promptOrBody = "In the Raft consensus protocol, what mechanism prevents split-brain split votes during leader elections?",
-            explanation = "Randomized election timeouts stagger candidate heartbeats, ensuring one candidate almost always reaches a majority quorum first.",
-            difficulty = Difficulty.HARD,
-            options = listOf(
-                "Randomized election timeouts across nodes" to true,
-                "Centralized atomic clock synchronization" to false,
-                "Manual human operator intervention" to false,
-                "Two-phase locking on all followers" to false
-            )
-        )
-        store.createManualItem(
-            subjectId = dist.id,
-            topicName = "Raft Consensus",
-            lectureId = distLec.id,
-            kind = LearningItemKind.DROP,
-            promptOrBody = "Raft quorum: For a cluster of N nodes, any committed state transition requires approval from at least (N/2 + 1) nodes.",
-            explanation = "Safety invariant for distributed state machines",
-            difficulty = Difficulty.MEDIUM
-        )
-
-        // Course 3: Machine Learning & AI
-        val ml = store.createOrUpdateSubject(
-            name = "Machine Learning",
-            colorKey = "cyan",
-            iconKey = "psychology",
-            term = "Fall 2026",
-            instructor = "Prof. Vance"
-        )
-        store.upsertClassSlot(
-            ClassSlot(
-                id = "slot-ml",
-                subjectId = dist.id,
-                weekdayMask = 4 or 16, // Wed, Fri
-                startMinuteOfDay = 16 * 60,
-                endMinuteOfDay = 17 * 60 + 15,
-                zoneId = clock.zoneId().id,
-                location = "Auditorium C",
-                enabled = true
-            )
-        )
-        val mlLec = store.createOrUpdateLecture(
-            subjectId = ml.id,
-            title = "Attention Mechanisms & Transformers",
-            localDateIso = clock.localDate().toString(),
-            topicLabel = "Transformers",
-            notes = "Self-attention computes dynamic weights between query and key vectors using scaled dot-product attention."
-        )
-        store.createManualItem(
-            subjectId = ml.id,
-            topicName = "Transformers",
-            lectureId = mlLec.id,
-            kind = LearningItemKind.MCQ,
-            promptOrBody = "Why is the dot product of Query and Key scaled by the square root of the dimension (√d_k) in Transformers?",
-            explanation = "Scaling prevents dot products from growing excessively large for large dimensions, which would push the softmax function into regions with vanishing gradients.",
-            difficulty = Difficulty.HARD,
-            options = listOf(
-                "To prevent dot products from vanishing softmax gradients" to true,
-                "To compress the context window into fewer tokens" to false,
-                "To enforce causal masking during decoding" to false,
-                "To eliminate the need for multi-head projections" to false
-            )
-        )
-
-        keyVault.saveApiKey("AIzaSyDemoStudentKey1234")
-    }
-
     Window(
         onCloseRequest = ::exitApplication,
         title = "Quick Drop v0.0.1 — Premium Local-First Learning Companion",
@@ -974,15 +818,66 @@ fun HomeDashboard(
         SpacedRepetitionScheduler.resolveMasteryStatus(it, clock) == TopicMasteryStatus.STABLE
     }
 
+    val preferences by store.observePreferences().collectAsState(initial = com.quickdrop.core.model.UserPreferences())
+    val completedSessions by store.observeCompletedSessions().collectAsState(initial = emptyList())
+
+    val realStreakDays = remember(completedSessions) {
+        if (completedSessions.isEmpty()) 0
+        else {
+            val sessionDates = completedSessions
+                .mapNotNull { session ->
+                    session.endedAtEpochMs?.let { ms ->
+                        java.time.Instant.ofEpochMilli(ms).atZone(clock.zoneId()).toLocalDate().toString()
+                    }
+                }
+                .distinct()
+                .sortedDescending()
+                .toSet()
+
+            val today = clock.localDate()
+            var currentDay = today
+            var streak = 0
+
+            if (!sessionDates.contains(currentDay.toString())) {
+                currentDay = currentDay.minusDays(1)
+            }
+
+            while (sessionDates.contains(currentDay.toString())) {
+                streak++
+                currentDay = currentDay.minusDays(1)
+            }
+            streak
+        }
+    }
+
+    val realReadinessPercent = remember(reviewStates, completedSessions, stableCount) {
+        val totalTopics = reviewStates.size
+        val totalAnswered = completedSessions.sumOf { it.answeredCount }
+        val totalCorrect = completedSessions.sumOf { it.correctCount }
+
+        when {
+            totalTopics > 0 && totalAnswered > 0 -> {
+                val masteryRatio = (stableCount * 100) / totalTopics
+                val accuracyRatio = (totalCorrect * 100) / totalAnswered
+                ((masteryRatio + accuracyRatio) / 2).coerceIn(0, 100)
+            }
+            totalTopics > 0 -> ((stableCount * 100) / totalTopics).coerceIn(0, 100)
+            totalAnswered > 0 -> ((totalCorrect * 100) / totalAnswered).coerceIn(0, 100)
+            else -> 0
+        }
+    }
+
+    val studentDisplayName = preferences.displayName.trim().ifBlank { "Scholar" }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // Hero Readiness Banner
         item {
             HeroReadinessCard(
-                studentName = "Alex",
-                streakDays = 4,
-                readinessPercent = 88,
+                studentName = studentDisplayName,
+                streakDays = realStreakDays,
+                readinessPercent = realReadinessPercent,
                 nextClassTitle = nextSubj?.name?.let { "$it (${nextOcc?.startZoned?.toLocalTime()})" },
-                nextClassCountdown = "TODAY",
+                nextClassCountdown = if (nextOcc != null) "TODAY" else null,
                 nextClassLocation = nextOcc?.location,
                 onLaunchPrepQuiz = { onLaunchQuizSetup(nextSubj?.id) }
             )
@@ -1111,8 +1006,8 @@ fun HomeDashboard(
                             )
                             StatMetricCard(
                                 label = "Study Streak",
-                                value = "4 Days",
-                                subtext = "Keep momentum!",
+                                value = "$realStreakDays ${if (realStreakDays == 1) "Day" else "Days"}",
+                                subtext = if (realStreakDays > 0) "Keep momentum!" else "Complete a quiz",
                                 icon = Icons.Default.LocalFireDepartment,
                                 iconColor = QuickDropColors.Rose,
                                 modifier = Modifier.weight(1f)
@@ -1150,8 +1045,8 @@ fun HomeDashboard(
                         )
                         StatMetricCard(
                             label = "Study Streak",
-                            value = "4 Days",
-                            subtext = "Keep momentum!",
+                            value = "$realStreakDays ${if (realStreakDays == 1) "Day" else "Days"}",
+                            subtext = if (realStreakDays > 0) "Keep momentum!" else "Complete a quiz",
                             icon = Icons.Default.LocalFireDepartment,
                             iconColor = QuickDropColors.Rose,
                             modifier = Modifier.weight(1f)
@@ -2192,7 +2087,36 @@ fun AnalyticsProgressView(
     val completedSessions by store.observeCompletedSessions().collectAsState(initial = emptyList())
     val totalCorrect = completedSessions.sumOf { it.correctCount }
     val totalAnswered = completedSessions.sumOf { it.answeredCount }
-    val accuracy = if (totalAnswered > 0) (totalCorrect * 100) / totalAnswered else 88
+    val accuracy = if (totalAnswered > 0) (totalCorrect * 100) / totalAnswered else 0
+
+    val realStreak = remember(completedSessions) {
+        if (completedSessions.isEmpty()) 0
+        else {
+            val sessionDates = completedSessions
+                .mapNotNull { session ->
+                    session.endedAtEpochMs?.let { ms ->
+                        java.time.Instant.ofEpochMilli(ms).atZone(clock.zoneId()).toLocalDate().toString()
+                    }
+                }
+                .distinct()
+                .sortedDescending()
+                .toSet()
+
+            val today = clock.localDate()
+            var currentDay = today
+            var streak = 0
+
+            if (!sessionDates.contains(currentDay.toString())) {
+                currentDay = currentDay.minusDays(1)
+            }
+
+            while (sessionDates.contains(currentDay.toString())) {
+                streak++
+                currentDay = currentDay.minusDays(1)
+            }
+            streak
+        }
+    }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -2224,7 +2148,7 @@ fun AnalyticsProgressView(
                 )
                 StatMetricCard(
                     label = "Quiz Sessions",
-                    value = "${completedSessions.size.coerceAtLeast(6)}",
+                    value = "${completedSessions.size}",
                     subtext = "Practiced locally",
                     icon = Icons.Default.Quiz,
                     iconColor = QuickDropColors.Violet,
@@ -2232,8 +2156,8 @@ fun AnalyticsProgressView(
                 )
                 StatMetricCard(
                     label = "Active Streak",
-                    value = "4 Days",
-                    subtext = "Top 5% consistency",
+                    value = "$realStreak ${if (realStreak == 1) "Day" else "Days"}",
+                    subtext = if (realStreak > 0) "Daily consistency" else "Take a quiz to start",
                     icon = Icons.Default.LocalFireDepartment,
                     iconColor = QuickDropColors.Amber,
                     modifier = Modifier.weight(1f)

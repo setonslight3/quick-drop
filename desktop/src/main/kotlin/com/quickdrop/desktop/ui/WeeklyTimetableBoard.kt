@@ -208,11 +208,43 @@ fun WeeklyTimetableBoard(
 
     val registeredCourses = remember(slots, subjects) { getRegisteredCoursesSummary(slots, subjects) }
 
-    val totalCourses = registeredCourses.size.coerceAtLeast(8)
-    val coreCount = registeredCourses.count { it.isCore }.coerceAtLeast(6)
-    val electiveCount = (totalCourses - coreCount).coerceAtLeast(2)
-    val totalUnits = registeredCourses.sumOf { it.units }.let { if (it > 0) it else 17 }
-    val weeklyHours = 17 // Mon (5h) + Tue (6h) + Thu (6h) = 17h
+    val totalCourses = registeredCourses.size
+    val coreCount = registeredCourses.count { it.isCore }
+    val electiveCount = registeredCourses.count { !it.isCore }
+    val totalUnits = registeredCourses.sumOf { it.units }
+    val weeklyMinutes = slots.filter { it.enabled }.sumOf { (it.endMinuteOfDay - it.startMinuteOfDay).coerceAtLeast(0) }
+    val weeklyHours = (weeklyMinutes + 30) / 60
+
+    val hasMon = mondaySessions.isNotEmpty()
+    val hasTue = tuesdaySessions.isNotEmpty()
+    val hasWed = wednesdaySessions.isNotEmpty()
+    val hasThu = thursdaySessions.isNotEmpty()
+    val hasFri = fridaySessions.isNotEmpty()
+
+    val freeDaysList = buildList {
+        if (!hasMon) add("Mon")
+        if (!hasTue) add("Tue")
+        if (!hasWed) add("Wed")
+        if (!hasThu) add("Thu")
+        if (!hasFri) add("Fri")
+    }
+
+    val freeDaysText = when {
+        freeDaysList.isEmpty() -> "None"
+        freeDaysList.size == 5 -> "All Free (No classes)"
+        freeDaysList.size == 2 -> "${freeDaysList[0]} & ${freeDaysList[1]}"
+        else -> freeDaysList.joinToString(", ")
+    }
+
+    val activeDaysList = buildList {
+        if (hasMon) add("Mon")
+        if (hasTue) add("Tue")
+        if (hasWed) add("Wed")
+        if (hasThu) add("Thu")
+        if (hasFri) add("Fri")
+    }
+
+    val activeDaysText = if (activeDaysList.isEmpty()) "No classes scheduled" else activeDaysList.joinToString(", ")
 
     val verticalScrollState = rememberScrollState()
 
@@ -443,7 +475,7 @@ fun WeeklyTimetableBoard(
                             modifier = Modifier.weight(1f),
                             label = "Total Credit Units",
                             value = "$totalUnits Units",
-                            subtitle = "First Semester Load",
+                            subtitle = if (totalUnits > 0) "Semester Load" else "No units registered",
                             icon = Icons.Default.FlashOn,
                             iconTint = Color(0xFFF59E0B),
                             iconBg = Color(0x26F59E0B)
@@ -457,7 +489,7 @@ fun WeeklyTimetableBoard(
                             modifier = Modifier.weight(1f),
                             label = "Weekly Contact Hours",
                             value = "$weeklyHours Hours",
-                            subtitle = "Mon, Tue & Thu (8am – 4pm)",
+                            subtitle = activeDaysText,
                             icon = Icons.Default.Schedule,
                             iconTint = Color(0xFFF43F5E),
                             iconBg = Color(0x26F43F5E)
@@ -465,8 +497,8 @@ fun WeeklyTimetableBoard(
                         StatMetricCard(
                             modifier = Modifier.weight(1f),
                             label = "Free Days",
-                            value = "Wed & Fri",
-                            subtitle = "No lectures at all",
+                            value = freeDaysText,
+                            subtitle = if (freeDaysList.isEmpty()) "Classes every weekday" else "No lectures scheduled",
                             icon = Icons.Default.AutoAwesome,
                             iconTint = Color(0xFF10B981),
                             iconBg = Color(0x2610B981)
@@ -482,7 +514,7 @@ fun WeeklyTimetableBoard(
                         modifier = Modifier.weight(1f),
                         label = "Registered Courses",
                         value = "$totalCourses Courses",
-                        subtitle = "$coreCount Core (C) • $electiveCount Elective (E)",
+                        subtitle = "$coreCount Core • $electiveCount Elective",
                         icon = Icons.Default.MenuBook,
                         iconTint = QuickDropColors.CyanLight,
                         iconBg = Color(0x2606B6D4)
@@ -491,7 +523,7 @@ fun WeeklyTimetableBoard(
                         modifier = Modifier.weight(1f),
                         label = "Total Credit Units",
                         value = "$totalUnits Units",
-                        subtitle = "First Semester Load",
+                        subtitle = if (totalUnits > 0) "Semester Load" else "No units registered",
                         icon = Icons.Default.FlashOn,
                         iconTint = Color(0xFFF59E0B),
                         iconBg = Color(0x26F59E0B)
@@ -500,7 +532,7 @@ fun WeeklyTimetableBoard(
                         modifier = Modifier.weight(1f),
                         label = "Weekly Contact Hours",
                         value = "$weeklyHours Hours",
-                        subtitle = "Mon, Tue & Thu (8am – 4pm)",
+                        subtitle = activeDaysText,
                         icon = Icons.Default.Schedule,
                         iconTint = Color(0xFFF43F5E),
                         iconBg = Color(0x26F43F5E)
@@ -508,8 +540,8 @@ fun WeeklyTimetableBoard(
                     StatMetricCard(
                         modifier = Modifier.weight(1f),
                         label = "Free Days",
-                        value = "Wed & Fri",
-                        subtitle = "No lectures at all",
+                        value = freeDaysText,
+                        subtitle = if (freeDaysList.isEmpty()) "Classes every weekday" else "No lectures scheduled",
                         icon = Icons.Default.AutoAwesome,
                         iconTint = Color(0xFF10B981),
                         iconBg = Color(0x2610B981)

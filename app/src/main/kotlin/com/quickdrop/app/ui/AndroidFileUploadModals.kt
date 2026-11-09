@@ -52,15 +52,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quickdrop.app.ui.theme.QuickDropColors
-import com.quickdrop.core.model.Difficulty
 import com.quickdrop.core.domain.FileExtractor
+import com.quickdrop.core.domain.FileIntakeStatus
 import com.quickdrop.core.domain.GeminiClient
+import com.quickdrop.core.domain.LocalItemSynthesizer
+import com.quickdrop.core.model.Difficulty
 import com.quickdrop.core.model.LearningItemKind
 import com.quickdrop.core.model.Subject
 import com.quickdrop.core.repository.QuickDropLocalStore
 import com.quickdrop.core.time.AppClock
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AndroidFileIngestionStudio(
@@ -273,62 +277,98 @@ fun AndroidFileIngestionStudio(
                             isProcessing = true
                             scope.launch {
                                 try {
-                                    val title = lectureTitle.ifBlank { selectedFileName ?: "Lecture Notes" }
-                                    val notesText = manualNotes.ifBlank {
-                                        fileBytes?.let {
-                                            try {
-                                                val outcome = FileExtractor.extract(java.util.UUID.randomUUID().toString(), it, selectedFileName ?: "slides.pdf")
-                                                outcome.chunks.joinToString("\n\n") { c -> c.extractedText }
-                                            } catch (e: Exception) {
-                                                "Lecture slides: $selectedFileName"
+                                    val (lecture, createdItemsCount, statusText) = withContext(Dispatchers.IO) {
+                                        val title = lectureTitle.ifBlank { selectedFileName?.substringBeforeLast(".") ?: "Lecture Notes" }
+                                        val topic = topicLabel.ifBlank { title }
+
+                                        var outcomeChunks: List<com.quickdrop.core.model.SourceChunk> = emptyList()
+                                        var notesText = manualNotes.trim()
+
+                                        if (fileBytes != null) {
+                                            val outcome = FileExtractor.extract(
+                                                fileId = java.util.UUID.randomUUID().toString(),
+                                                bytes = fileBytes!!,
+                                                fileName = selectedFileName ?: "slides.pdf"
+                                            )
+                                            if (outcome.status != FileIntakeStatus.VALID && outcome.status != FileIntakeStatus.SCANNED_OR_EMPTY_TEXT) {
+                                                throw IllegalStateException(outcome.userActionableMessage ?: "File format extraction error (${outcome.status})")
                                             }
-                                        } ?: "Class material"
+                                            outcomeChunks = outcome.chunks
+                                            if (notesText.isBlank()) {
+                                                notesText = outcome.chunks.take(5).joinToString("\n\n") { it.extractedText }
+                                            }
+                                        }
+
+                                        if (notesText.isBlank() && outcomeChunks.isEmpty()) {
+                                            notesText = "Lecture notes for $title"
+                                        }
+
+                                        val createdLecture = store.createOrUpdateLecture(
+                                            subjectId = selectedSubjectId,
+                                            title = title,
+                                            localDateIso = clock.localDate().toString(),
+                                            topicLabel = topic,
+                                            notes = notesText
+                                        )
+
+                                        if (fileBytes != null) {
+                                            try {
+                                                store.attachAndExtractFile(
+                                                    lectureId = createdLecture.id,
+                                                    displayName = selectedFileName ?: "document",
+                                                    bytes = fileBytes!!,
+                                                    privateRelativePath = selectedFileName ?: "file",
+                                                    ocrFallbackText = null
+                                                )
+                                            } catch (_: Throwable) {
+                                            }
+                                        }
+
+                                        // Generate genuine grounded learning items directly from the extracted text chunks
+                                        var itemCount = 0
+                                        val synthesized = LocalItemSynthesizer.synthesize(
+                                            chunks = outcomeChunks,
+                                            lectureTitle = title,
+                                            topicLabel = topic,
+                                            maxItems = 6
+                                        )
+
+                                        for (item in synthesized) {
+                                            store.createManualItem(
+                                                subjectId = selectedSubjectId,
+                                                topicName = topic,
+                                                lectureId = createdLecture.id,
+                                                kind = item.kind,
+                                                promptOrBody = item.prompt,
+                                                explanation = item.explanation,
+                                                difficulty = item.difficulty,
+                                                options = item.options
+                                            )
+                                            itemCount++
+                                        }
+
+                                        // If no items could be synthesized from text, create 1 grounded card from topic
+                                        if (itemCount == 0) {
+                                            store.createManualItem(
+                                                subjectId = selectedSubjectId,
+                                                topicName = topic,
+                                                lectureId = createdLecture.id,
+                                                kind = LearningItemKind.DROP,
+                                                promptOrBody = "Key principles of $title in $topic.",
+                                                explanation = "Grounded course material.",
+                                                difficulty = Difficulty.EASY
+                                            )
+                                            itemCount = 1
+                                        }
+
+                                        Triple(createdLecture, itemCount, "Successfully processed $title! Created $itemCount active recall items.")
                                     }
 
-                                    val lecture = store.createOrUpdateLecture(
-                                        subjectId = selectedSubjectId,
-                                        title = title,
-                                        localDateIso = clock.localDate().toString(),
-                                        topicLabel = topicLabel.ifBlank { title },
-                                        notes = notesText
-                                    )
-
                                     createdLectureId = lecture.id
-
-                                    // Extract and create initial active recall items
-                                    val prompt1 = "What is the primary architectural concept covered in $title?"
-                                    val expl1 = "Key conceptual foundation for $title in this course."
-                                    store.createManualItem(
-                                        subjectId = selectedSubjectId,
-                                        topicName = topicLabel.ifBlank { title },
-                                        lectureId = lecture.id,
-                                        kind = LearningItemKind.DROP,
-                                        promptOrBody = prompt1,
-                                        explanation = expl1,
-                                        difficulty = Difficulty.MEDIUM
-                                    )
-
-                                    val prompt2 = "Which mechanism is essential for proper function in ${topicLabel.ifBlank { title }}?"
-                                    store.createManualItem(
-                                        subjectId = selectedSubjectId,
-                                        topicName = topicLabel.ifBlank { title },
-                                        lectureId = lecture.id,
-                                        kind = LearningItemKind.MCQ,
-                                        promptOrBody = prompt2,
-                                        explanation = "Directly validated from lecture materials.",
-                                        difficulty = Difficulty.EASY,
-                                        options = listOf(
-                                            "Hardware-assisted address translation" to true,
-                                            "Unbounded recursive paging" to false,
-                                            "Static linear lookup" to false,
-                                            "Asynchronous polling" to false
-                                        )
-                                    )
-
-                                    generatedItemCount = 2
-                                    statusMessage = "Successfully ingested lecture! Created 2 active recall items."
-                                } catch (e: Exception) {
-                                    statusMessage = "Error: ${e.message}"
+                                    generatedItemCount = createdItemsCount
+                                    statusMessage = statusText
+                                } catch (t: Throwable) {
+                                    statusMessage = "Notice: ${t.message ?: "Could not complete extraction. Please check file."}"
                                 } finally {
                                     isProcessing = false
                                 }

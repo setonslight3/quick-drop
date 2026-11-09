@@ -480,6 +480,8 @@ private fun HomeScreen(
     onOpenUpload: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val preferences by app.localStore.observePreferences().collectAsState(initial = com.quickdrop.core.model.UserPreferences())
+    val completedSessions by app.localStore.observeCompletedSessions().collectAsState(initial = emptyList())
     val subjects by app.localStore.observeActiveSubjects().collectAsState(initial = emptyList())
     val activeSession by app.localStore.observeActiveSession().collectAsState(initial = null)
     val reviewStates by app.localStore.observeTopicReviewStates().collectAsState(initial = emptyMap())
@@ -502,15 +504,64 @@ private fun HomeScreen(
         SpacedRepetitionScheduler.resolveMasteryStatus(it, app.clock) == TopicMasteryStatus.STABLE
     }
 
+    val realStreakDays = remember(completedSessions) {
+        if (completedSessions.isEmpty()) 0
+        else {
+            val sessionDates = completedSessions
+                .mapNotNull { session ->
+                    session.endedAtEpochMs?.let { ms ->
+                        java.time.Instant.ofEpochMilli(ms).atZone(app.clock.zoneId()).toLocalDate().toString()
+                    }
+                }
+                .distinct()
+                .sortedDescending()
+                .toSet()
+
+            val today = app.clock.localDate()
+            var currentDay = today
+            var streak = 0
+
+            // If not completed today, check if active yesterday
+            if (!sessionDates.contains(currentDay.toString())) {
+                currentDay = currentDay.minusDays(1)
+            }
+
+            while (sessionDates.contains(currentDay.toString())) {
+                streak++
+                currentDay = currentDay.minusDays(1)
+            }
+            streak
+        }
+    }
+
+    val realReadinessPercent = remember(reviewStates, completedSessions, stableCount) {
+        val totalTopics = reviewStates.size
+        val totalAnswered = completedSessions.sumOf { it.answeredCount }
+        val totalCorrect = completedSessions.sumOf { it.correctCount }
+
+        when {
+            totalTopics > 0 && totalAnswered > 0 -> {
+                val masteryRatio = (stableCount * 100) / totalTopics
+                val accuracyRatio = (totalCorrect * 100) / totalAnswered
+                ((masteryRatio + accuracyRatio) / 2).coerceIn(0, 100)
+            }
+            totalTopics > 0 -> ((stableCount * 100) / totalTopics).coerceIn(0, 100)
+            totalAnswered > 0 -> ((totalCorrect * 100) / totalAnswered).coerceIn(0, 100)
+            else -> 0
+        }
+    }
+
+    val studentDisplayName = preferences.displayName.trim().ifBlank { "Scholar" }
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Hero Readiness Card
         item {
             HeroReadinessCard(
-                studentName = "Alex",
-                streakDays = 4,
-                readinessPercent = 88,
+                studentName = studentDisplayName,
+                streakDays = realStreakDays,
+                readinessPercent = realReadinessPercent,
                 nextClassTitle = nextSubj?.name?.let { "$it (${nextOcc?.startZoned?.toLocalTime()})" },
-                nextClassCountdown = "TODAY",
+                nextClassCountdown = if (nextOcc != null) "TODAY" else null,
                 nextClassLocation = nextOcc?.location,
                 onLaunchPrepQuiz = { onOpenQuizSetup(nextSubj?.id) }
             )
@@ -650,8 +701,8 @@ private fun HomeScreen(
                     )
                     StatMetricCard(
                         label = "Study Streak",
-                        value = "4 Days",
-                        subtext = "Keep momentum!",
+                        value = "$realStreakDays ${if (realStreakDays == 1) "Day" else "Days"}",
+                        subtext = if (realStreakDays > 0) "Keep momentum!" else "Complete a quiz",
                         icon = Icons.Default.LocalFireDepartment,
                         iconColor = QuickDropColors.Rose,
                         modifier = Modifier.weight(1f)

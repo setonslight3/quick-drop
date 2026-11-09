@@ -41,6 +41,14 @@ object FileExtractor {
     const val MAX_PAGES_OR_SLIDES: Int = 200
     const val MAX_CHUNK_TOKENS: Int = 600
 
+    val isAwtAvailable: Boolean by lazy {
+        try {
+            Class.forName("java.awt.image.BufferedImage") != null
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun sha256Hex(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
         return digest.joinToString("") { "%02x".format(it) }
@@ -185,24 +193,72 @@ object FileExtractor {
                 userActionableMessage = "Unsupported or unrecognized file format. Accepted formats: PDF, PPTX, HTML, JPEG, PNG, WebP, Text."
             )
 
-        return when (mime) {
-            "application/pdf" -> extractPdf(fileId, bytes, hash, ocrFallbackText)
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> extractPptx(fileId, bytes, hash)
-            "image/png", "image/jpeg", "image/webp" -> extractImage(fileId, mime, hash, ocrFallbackText)
-            "text/html" -> extractHtml(fileId, bytes, hash)
-            "text/plain" -> extractPlainText(fileId, bytes, hash)
-            else -> ExtractionOutcome(
-                status = FileIntakeStatus.UNSUPPORTED_MIME_OR_SIGNATURE,
+        return try {
+            when (mime) {
+                "application/pdf" -> extractPdf(fileId, bytes, hash, ocrFallbackText)
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> extractPptx(fileId, bytes, hash)
+                "image/png", "image/jpeg", "image/webp" -> extractImage(fileId, mime, hash, ocrFallbackText)
+                "text/html" -> extractHtml(fileId, bytes, hash)
+                "text/plain" -> extractPlainText(fileId, bytes, hash)
+                else -> ExtractionOutcome(
+                    status = FileIntakeStatus.UNSUPPORTED_MIME_OR_SIGNATURE,
+                    detectedMimeType = mime,
+                    sha256 = hash,
+                    pageOrSlideCount = 0,
+                    chunks = emptyList(),
+                    userActionableMessage = "Unsupported file format."
+                )
+            }
+        } catch (t: Throwable) {
+            ExtractionOutcome(
+                status = FileIntakeStatus.CORRUPT_FILE,
                 detectedMimeType = mime,
                 sha256 = hash,
                 pageOrSlideCount = 0,
                 chunks = emptyList(),
-                userActionableMessage = "Unsupported file format."
+                userActionableMessage = "Error reading $fileName: ${t.message ?: "Unreadable file structure"}"
             )
         }
     }
 
     private fun extractPdf(
+        fileId: String,
+        bytes: ByteArray,
+        sha256: String,
+        ocrFallbackText: String?
+    ): ExtractionOutcome {
+        // If AWT is present (desktop environment), try PDFBox first, catching any LinkageError or Throwable
+        if (isAwtAvailable) {
+            try {
+                val boxOutcome = extractPdfWithPdfBox(fileId, bytes, sha256, ocrFallbackText)
+                if (boxOutcome.status != FileIntakeStatus.SCANNED_OR_EMPTY_TEXT) {
+                    return boxOutcome
+                }
+            } catch (_: Throwable) {
+                // PDFBox failed or linkage error - fallback to pure stream parser
+            }
+        }
+
+        // Pure Android & JVM stream extractor - zero AWT dependency, 100% crash-proof
+        val streamResult = PdfStreamExtractor.extract(
+            fileId = fileId,
+            bytes = bytes,
+            maxPages = MAX_PAGES_OR_SLIDES,
+            maxChunkTokens = MAX_CHUNK_TOKENS,
+            ocrFallbackText = ocrFallbackText
+        )
+
+        return ExtractionOutcome(
+            status = streamResult.status,
+            detectedMimeType = "application/pdf",
+            sha256 = sha256,
+            pageOrSlideCount = streamResult.pageCount,
+            chunks = streamResult.chunks,
+            userActionableMessage = streamResult.errorMessage
+        )
+    }
+
+    private fun extractPdfWithPdfBox(
         fileId: String,
         bytes: ByteArray,
         sha256: String,
@@ -295,9 +351,9 @@ object FileExtractor {
                     chunks = chunks
                 )
             }
-        } catch (e: Exception) {
-            if (e.message?.contains("decrypt", ignoreCase = true) == true ||
-                e.message?.contains("password", ignoreCase = true) == true
+        } catch (t: Throwable) {
+            if (t.message?.contains("decrypt", ignoreCase = true) == true ||
+                t.message?.contains("password", ignoreCase = true) == true
             ) {
                 ExtractionOutcome(
                     status = FileIntakeStatus.ENCRYPTED_FILE,

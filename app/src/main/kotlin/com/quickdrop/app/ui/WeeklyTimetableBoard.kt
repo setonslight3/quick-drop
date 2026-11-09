@@ -190,11 +190,43 @@ fun WeeklyTimetableBoard(
 
     val registeredCourses = remember(slots, subjects) { getRegisteredCoursesSummary(slots, subjects) }
 
-    val totalCourses = registeredCourses.size.coerceAtLeast(8)
-    val coreCount = registeredCourses.count { it.isCore }.coerceAtLeast(6)
-    val electiveCount = (totalCourses - coreCount).coerceAtLeast(2)
-    val totalUnits = registeredCourses.sumOf { it.units }.let { if (it > 0) it else 17 }
-    val weeklyHours = 17 // Mon (5h) + Tue (6h) + Thu (6h) = 17h
+    val totalCourses = registeredCourses.size
+    val coreCount = registeredCourses.count { it.isCore }
+    val electiveCount = registeredCourses.count { !it.isCore }
+    val totalUnits = registeredCourses.sumOf { it.units }
+    val weeklyMinutes = slots.filter { it.enabled }.sumOf { (it.endMinuteOfDay - it.startMinuteOfDay).coerceAtLeast(0) }
+    val weeklyHours = (weeklyMinutes + 30) / 60
+
+    val hasMon = mondaySessions.isNotEmpty()
+    val hasTue = tuesdaySessions.isNotEmpty()
+    val hasWed = wednesdaySessions.isNotEmpty()
+    val hasThu = thursdaySessions.isNotEmpty()
+    val hasFri = fridaySessions.isNotEmpty()
+
+    val freeDaysList = buildList {
+        if (!hasMon) add("Mon")
+        if (!hasTue) add("Tue")
+        if (!hasWed) add("Wed")
+        if (!hasThu) add("Thu")
+        if (!hasFri) add("Fri")
+    }
+
+    val freeDaysText = when {
+        freeDaysList.isEmpty() -> "None"
+        freeDaysList.size == 5 -> "All Free (No classes)"
+        freeDaysList.size == 2 -> "${freeDaysList[0]} & ${freeDaysList[1]}"
+        else -> freeDaysList.joinToString(", ")
+    }
+
+    val activeDaysList = buildList {
+        if (hasMon) add("Mon")
+        if (hasTue) add("Tue")
+        if (hasWed) add("Wed")
+        if (hasThu) add("Thu")
+        if (hasFri) add("Fri")
+    }
+
+    val activeDaysText = if (activeDaysList.isEmpty()) "No classes scheduled" else activeDaysList.joinToString(", ")
 
     val verticalScrollState = rememberScrollState()
 
@@ -385,7 +417,7 @@ fun WeeklyTimetableBoard(
                         StatsCard(
                             label = "Registered Courses",
                             mainText = "$totalCourses Courses",
-                            subText = "$coreCount Core (C) • $electiveCount Elective (E)",
+                            subText = "$coreCount Core • $electiveCount Elective",
                             badgeIcon = "📚",
                             badgeBg = Color(0x263B82F6),
                             modifier = Modifier.weight(1f)
@@ -393,7 +425,7 @@ fun WeeklyTimetableBoard(
                         StatsCard(
                             label = "Total Credit Units",
                             mainText = "$totalUnits Units",
-                            subText = "First Semester Load",
+                            subText = if (totalUnits > 0) "Semester Load" else "No units registered",
                             badgeIcon = "⚡",
                             badgeBg = Color(0x26F59E0B),
                             modifier = Modifier.weight(1f)
@@ -403,15 +435,15 @@ fun WeeklyTimetableBoard(
                         StatsCard(
                             label = "Weekly Contact Hours",
                             mainText = "$weeklyHours Hours",
-                            subText = "Mon, Tue & Thu (8am – 4pm)",
+                            subText = activeDaysText,
                             badgeIcon = "⏰",
                             badgeBg = Color(0x26A855F7),
                             modifier = Modifier.weight(1f)
                         )
                         StatsCard(
                             label = "Free Days",
-                            mainText = "Wed & Fri",
-                            subText = "No lectures at all",
+                            mainText = freeDaysText,
+                            subText = if (freeDaysList.isEmpty()) "Classes every weekday" else "No lectures scheduled",
                             badgeIcon = "✨",
                             badgeBg = Color(0x2610B981),
                             modifier = Modifier.weight(1f)
@@ -426,7 +458,7 @@ fun WeeklyTimetableBoard(
                     StatsCard(
                         label = "Registered Courses",
                         mainText = "$totalCourses Courses",
-                        subText = "$coreCount Core (C) • $electiveCount Elective (E)",
+                        subText = "$coreCount Core • $electiveCount Elective",
                         badgeIcon = "📚",
                         badgeBg = Color(0x263B82F6),
                         modifier = Modifier.weight(1f)
@@ -434,7 +466,7 @@ fun WeeklyTimetableBoard(
                     StatsCard(
                         label = "Total Credit Units",
                         mainText = "$totalUnits Units",
-                        subText = "First Semester Load",
+                        subText = if (totalUnits > 0) "Semester Load" else "No units registered",
                         badgeIcon = "⚡",
                         badgeBg = Color(0x26F59E0B),
                         modifier = Modifier.weight(1f)
@@ -442,15 +474,15 @@ fun WeeklyTimetableBoard(
                     StatsCard(
                         label = "Weekly Contact Hours",
                         mainText = "$weeklyHours Hours",
-                        subText = "Mon, Tue & Thu (8am – 4pm)",
+                        subText = activeDaysText,
                         badgeIcon = "⏰",
                         badgeBg = Color(0x26A855F7),
                         modifier = Modifier.weight(1f)
                     )
                     StatsCard(
                         label = "Free Days",
-                        mainText = "Wed & Fri",
-                        subText = "No lectures at all",
+                        mainText = freeDaysText,
+                        subText = if (freeDaysList.isEmpty()) "Classes every weekday" else "No lectures scheduled",
                         badgeIcon = "✨",
                         badgeBg = Color(0x2610B981),
                         modifier = Modifier.weight(1f)

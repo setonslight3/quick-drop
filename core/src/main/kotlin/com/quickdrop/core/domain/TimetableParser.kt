@@ -527,14 +527,29 @@ object TimetableParser {
     // 3. PDF TIMETABLE PARSER
     // =========================================================================
     private fun parsePdf(bytes: ByteArray, fileName: String): TimetableParseResult {
-        val text = try {
-            PDDocument.load(bytes).use { doc ->
-                val stripper = PDFTextStripper()
-                stripper.sortByPosition = true
-                stripper.getText(doc)
+        var text = ""
+        if (FileExtractor.isAwtAvailable) {
+            try {
+                text = PDDocument.load(bytes).use { doc ->
+                    val stripper = PDFTextStripper()
+                    stripper.sortByPosition = true
+                    stripper.getText(doc)
+                }
+            } catch (_: Throwable) {
+                text = ""
             }
-        } catch (_: Exception) {
-            ""
+        }
+        if (text.isBlank()) {
+            try {
+                val streamOutcome = PdfStreamExtractor.extract(
+                    fileId = "timetable-doc",
+                    bytes = bytes,
+                    maxPages = 50
+                )
+                text = streamOutcome.chunks.joinToString("\n") { it.extractedText }
+            } catch (_: Throwable) {
+                text = ""
+            }
         }
 
         val slots = parseTextLines(text)
