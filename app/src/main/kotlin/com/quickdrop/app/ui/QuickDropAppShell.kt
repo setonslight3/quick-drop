@@ -401,8 +401,10 @@ fun QuickDropAppShell(
                             store = app.localStore,
                             clock = app.clock,
                             geminiClient = app.activeGeminiClient(),
+                            apiKeyVault = app.apiKeyVault,
                             subjects = subjects,
-                            onReviewLecture = { activeScreen = ActiveScreen.MaterialReview(it) }
+                            onReviewLecture = { activeScreen = ActiveScreen.MaterialReview(it) },
+                            onOpenSettings = { activeScreen = ActiveScreen.Settings }
                         )
 
                         BottomNavTab.PROGRESS -> ProgressScreen(app = app)
